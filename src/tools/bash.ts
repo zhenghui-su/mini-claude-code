@@ -1,6 +1,7 @@
 import { detectDanger } from '../utils/safety';
 import { confirmFromUser } from '../utils/confirm';
 import { truncateOutput } from '../utils/truncate';
+import { fail, ok, type ToolResult } from './result';
 
 interface Params {
 	command: string;
@@ -10,17 +11,17 @@ interface Params {
 export async function bash({
 	command,
 	timeout = 30_000,
-}: Params): Promise<string> {
+}: Params): Promise<ToolResult> {
 	// 先检测危险命令
 	const dangerLevel = detectDanger(command);
 	if (dangerLevel === 'block') {
-		return `拒绝执行: 该命令已被自动阻止(高风险操作)。\n命令: ${command}`;
+		return fail(`拒绝执行：该命令已被自动阻止（高风险操作）。\n命令：${command}`);
 	}
 	if (dangerLevel === 'confirm') {
 		const approved = await confirmFromUser(command);
 		if (!approved) {
 			// 将拒绝结果返回给 LLM，让它自行调整策略
-			return `用户拒绝执行命令：${command}`;
+			return fail(`用户拒绝执行命令：${command}`);
 		}
 	}
 	// 执行命令
@@ -44,7 +45,7 @@ export async function bash({
 		]);
 		exitCode = await proc.exited;
 	} catch (e) {
-		return `执行失败: ${(e as Error).message}`;
+		return fail(`执行失败：${(e as Error).message}`);
 	} finally {
 		clearTimeout(timer);
 	}
@@ -56,5 +57,11 @@ export async function bash({
 	if (exitCode !== 0) parts.push(`[exit code: ${exitCode}]`);
 
 	const output = parts.join('\n').trim() || '(无输出)';
-	return truncateOutput('bash', output);
+	const truncatedOutput = truncateOutput('bash', output);
+
+	return ok(`命令执行完成：${command}（exit ${exitCode}）`, {
+		command,
+		exitCode,
+		output: truncatedOutput,
+	});
 }

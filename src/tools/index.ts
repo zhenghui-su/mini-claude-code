@@ -5,11 +5,61 @@ import { writeFile } from './write-file';
 import { editFile } from './edit-file';
 import { bash } from './bash';
 import { webFetch } from './web-fetch';
+import { listFiles } from './list-files';
+import { search } from './search';
 
 // 工具注册表
 // Vercel AI SDK 的 tool() 封装了 inputSchema(Zod) 和执行函数
 // SDK 自动处理：参数解析 → 执行 → 结果回填到 history
 export const TOOLS = {
+	list_files: tool({
+		description:
+			'列出工作目录内的文件和目录。用于先理解项目结构，默认跳过 .git、node_modules、.mini-claude。',
+		inputSchema: z.object({
+			path: z
+				.string()
+				.min(1)
+				.optional()
+				.describe('目录路径(相对于当前工作目录，默认 .)'),
+			depth: z
+				.number()
+				.int()
+				.nonnegative()
+				.optional()
+				.describe('递归深度，默认 2'),
+			includeHidden: z
+				.boolean()
+				.optional()
+				.describe('是否包含隐藏文件，默认 false'),
+		}),
+		execute: async (params) => listFiles(params),
+	}),
+
+	search: tool({
+		description:
+			'在工作目录内搜索文本。用于查找符号、文件内容或 TODO，默认跳过隐藏目录、.git、node_modules、.mini-claude。',
+		inputSchema: z.object({
+			query: z.string().min(1).describe('要搜索的文本，大小写不敏感'),
+			path: z
+				.string()
+				.min(1)
+				.optional()
+				.describe('搜索目录(相对于当前工作目录，默认 .)'),
+			glob: z
+				.string()
+				.min(1)
+				.optional()
+				.describe('简单 glob，例如 src/**/*.ts 或 *.md'),
+			maxResults: z
+				.number()
+				.int()
+				.positive()
+				.optional()
+				.describe('最多返回多少条匹配，默认 50'),
+		}),
+		execute: async (params) => search(params),
+	}),
+
 	read_file: tool({
 		description:
 			'读取本地文件内容。大文件建议用 offset + limit 分段读取，避免一次性读取撑爆上下文。输出带行号，方便定位。',

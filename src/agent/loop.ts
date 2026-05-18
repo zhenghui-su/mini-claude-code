@@ -9,6 +9,7 @@ import {
 import { model } from './provider';
 import { assembleSystemPrompt } from './prompt';
 import { TOOLS } from '../tools';
+import { getToolResultMessage } from '../tools/result';
 
 const MAX_AGENT_STEPS = 20;
 
@@ -22,6 +23,35 @@ export interface RunResult {
 interface AgentLoopOptions {
 	beforeStepLog?: () => void;
 	afterStepLog?: () => void;
+}
+
+export async function createExecutionPlan(
+	question: string,
+	history: ModelMessage[],
+	runtimeHints: string[] = [],
+): Promise<string> {
+	const system = await assembleSystemPrompt([
+		...runtimeHints,
+		[
+			'[计划模式]',
+			'本轮只制定执行计划，不要调用工具，不要修改文件，不要执行命令。',
+			'计划要简短、具体，说明会读取什么、可能修改什么、如何验证。',
+		].join('\n'),
+	]);
+
+	const { text } = await generateText({
+		model,
+		system,
+		messages: [
+			...history,
+			{
+				role: 'user',
+				content: `请先为这个任务制定执行计划，等待用户确认后再执行：\n\n${question}`,
+			},
+		],
+	});
+
+	return text;
 }
 
 // Agent 主要循环
@@ -118,9 +148,16 @@ function printStep({ text, toolCalls, toolResults }: StepInfo) {
 }
 
 function formatPreview(value: unknown): string {
+	const toolMessage = getToolResultMessage(value);
+	if (toolMessage) return compactPreview(toolMessage);
+
 	const text =
 		typeof value === 'string' ? value : JSON.stringify(value ?? {});
 
+	return compactPreview(text);
+}
+
+function compactPreview(text: string): string {
 	if (text.length <= 120) return text;
 	return text.slice(0, 119) + '…';
 }

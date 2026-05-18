@@ -1,11 +1,8 @@
-import { join } from 'path';
+import { SYSTEM_PROMPT } from './system-prompt';
 
 // 系统提示词分三段拼装：
-//   Segment 1: 静态核心指令（SYSTEM_PROMPT.md）
-//   Segment 2: 工具使用补充说明（动态，随工具增减自动更新）
-//   Segment 3: 运行时状态（可选，如上下文压缩摘要）
-
-const PROMPT_FILE = join(import.meta.dir, '../SYSTEM_PROMPT.md');
+//   Segment 1: 静态核心指令
+//   Segment 2: 运行时状态（可选，如上下文压缩摘要）
 
 export async function assembleSystemPrompt(
 	runtimeHints: string[] = [],
@@ -13,7 +10,7 @@ export async function assembleSystemPrompt(
 	const segments: string[] = [];
 
 	// Segment 1: 静态指令
-	segments.push(await Bun.file(PROMPT_FILE).text());
+	segments.push(SYSTEM_PROMPT);
 
 	// Segment 2: 运行时状态（有则注入）
 	if (runtimeHints.length > 0) {

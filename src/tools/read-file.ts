@@ -1,5 +1,6 @@
 import { resolveSafePath, isSensitivePath } from '../utils/safety';
 import { truncateOutput } from '../utils/truncate';
+import { fail, ok, type ToolResult } from './result';
 
 interface Params {
 	path: string;
@@ -13,13 +14,13 @@ export async function readFile({
 	path,
 	offset,
 	limit,
-}: Params): Promise<string> {
+}: Params): Promise<ToolResult> {
 	// 安全检查：路径穿越和敏感文件
 	let safePath: string;
 	try {
 		safePath = resolveSafePath(path);
 	} catch (e) {
-		return `错误：${(e as Error).message}`;
+		return fail(`错误：${(e as Error).message}`);
 	}
 
 	// 敏感文件提示（不阻止，但提醒）
@@ -28,7 +29,7 @@ export async function readFile({
 	}
 	const file = Bun.file(safePath);
 	if (!(await file.exists())) {
-		return `错误：文件不存在 - ${path}`;
+		return fail(`错误：文件不存在 - ${path}`);
 	}
 	const text = await file.text();
 	const lines = text.split('\n');
@@ -49,5 +50,13 @@ export async function readFile({
 			? `\n[显示第 ${start + 1}-${Math.min(end, lines.length)} 行，共 ${lines.length} 行]`
 			: `\n[共 ${lines.length} 行]`;
 
-	return truncateOutput('read_file', withLineNumbers + meta);
+	const content = truncateOutput('read_file', withLineNumbers + meta);
+
+	return ok(`已读取 ${path} 第 ${start + 1}-${Math.min(end, lines.length)} 行`, {
+		path,
+		content,
+		startLine: start + 1,
+		endLine: Math.min(end, lines.length),
+		totalLines: lines.length,
+	});
 }

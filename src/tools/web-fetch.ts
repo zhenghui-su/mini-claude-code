@@ -1,4 +1,5 @@
 import { truncateOutput } from '../utils/truncate';
+import { fail, ok, type ToolResult } from './result';
 
 interface Params {
 	url: string;
@@ -7,7 +8,7 @@ interface Params {
 /**
  * 从URL获取内容
  */
-export async function webFetch({ url }: Params): Promise<string> {
+export async function webFetch({ url }: Params): Promise<ToolResult> {
 	let response: Response;
 	try {
 		response = await fetch(url, {
@@ -15,11 +16,11 @@ export async function webFetch({ url }: Params): Promise<string> {
 			signal: AbortSignal.timeout(15_000), // 15秒超时
 		});
 	} catch (e) {
-		return `错误：请求失败 - ${(e as Error).message}`;
+		return fail(`错误：请求失败 - ${(e as Error).message}`);
 	}
 
 	if (!response.ok) {
-		return `错误: HTTP ${response.status} ${response.statusText} - ${url}`;
+		return fail(`错误：HTTP ${response.status} ${response.statusText} - ${url}`);
 	}
 
 	const contentType = response.headers.get('content-type') ?? '';
@@ -29,7 +30,11 @@ export async function webFetch({ url }: Params): Promise<string> {
 		? htmlToMarkdown(text)
 		: text;
 
-	return truncateOutput('web_fetch', content);
+	return ok(`已抓取 ${url}`, {
+		url,
+		contentType,
+		content: truncateOutput('web_fetch', content),
+	});
 }
 
 // 简单的 HTML → Markdown 转换

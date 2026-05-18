@@ -3,10 +3,28 @@ import { resolve } from 'path';
 // ── 危险命令检测 ──────────────────────────────────────────────────────────────
 
 export type DangerLevel = 'safe' | 'confirm' | 'block';
+export type ToolPermission = 'read' | 'write' | 'execute' | 'network';
+
+export const TOOL_PERMISSIONS: Record<string, ToolPermission> = {
+	read_file: 'read',
+	list_files: 'read',
+	search: 'read',
+	write_file: 'write',
+	edit_file: 'write',
+	bash: 'execute',
+	web_fetch: 'network',
+};
+
+export const TOOL_PERMISSION_DESCRIPTIONS: Record<ToolPermission, string> = {
+	read: '读取本地项目内容，不修改文件',
+	write: '创建或修改工作目录内的文件',
+	execute: '执行本地 Shell 命令',
+	network: '访问网络资源',
+};
 
 // block 级：直接拒绝，没有合法的 Agent 使用场景
 const BLOCK_PATTERNS: RegExp[] = [
-	/rm\s+-\S*r\S*f\s+(\/|~|\$HOME)\b/, // rm -rf / 或 rm -rf ~
+	/rm\s+-\S*r\S*f\s+(\/|~|\$HOME)(?:\s|$)/, // rm -rf / 或 rm -rf ~
 	/dd\s+if=.*of=\/dev\//, // dd 写入磁盘设备
 	/mkfs\./, // 格式化文件系统
 	/>\s*\/dev\/(sda|hda|nvme)/, // 重定向写入磁盘
