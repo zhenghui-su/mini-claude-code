@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>mini-claude-code · 教学用 Code Agent</title>
+	<style>
+		/* ── Reset & Base ────────────────────────────────────── */
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+		}
+
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+				'Helvetica Neue', Arial, 'Noto Sans SC', sans-serif;
+			background: #0d1117;
+			color: #e6edf3;
+			line-height: 1.7;
+			padding: 2rem 1.5rem;
+		}
+
+		.container {
+			max-width: 820px;
+			margin: 0 auto;
+		}
+
+		/* ── Hero ─────────────────────────────────────────────── */
+		.hero {
+			text-align: center;
+			padding: 4rem 0 3rem;
+		}
+
+		.hero .logo {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.6rem;
+			font-size: 2.2rem;
+			font-weight: 700;
+			letter-spacing: -0.5px;
+			margin-bottom: 0.8rem;
+		}
+
+		.hero .logo svg {
+			width: 40px;
+			height: 40px;
+		}
+
+		.hero .tagline {
+			font-size: 1.1rem;
+			color: #8b949e;
+			max-width: 520px;
+			margin: 0 auto 1.2rem;
+		}
+
+		.hero .version {
+			display: inline-block;
+			font-size: 0.8rem;
+			padding: 0.2rem 0.8rem;
+			border-radius: 9999px;
+			background: #1f6feb22;
+			color: #58a6ff;
+			border: 1px solid #1f6feb44;
+			font-weight: 500;
+		}
+
+		/* ── Section ──────────────────────────────────────────── */
+		.section {
+			margin: 3rem 0;
+		}
+
+		.section h2 {
+			font-size: 1.4rem;
+			font-weight: 600;
+			margin-bottom: 1.2rem;
+			padding-bottom: 0.4rem;
+			border-bottom: 1px solid #21262d;
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+		}
+
+		.section h2 .icon {
+			font-size: 1.3rem;
+		}
+
+		.section p {
+			color: #c9d1d9;
+			margin-bottom: 1rem;
+		}
+
+		/* ── Features Grid ───────────────────────────────────── */
+		.features {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+			gap: 1rem;
+		}
+
+		.feature-card {
+			background: #161b22;
+			border: 1px solid #21262d;
+			border-radius: 10px;
+			padding: 1.2rem 1rem;
+			transition: border-color 0.2s, transform 0.15s;
+		}
+
+		.feature-card:hover {
+			border-color: #30363d;
+			transform: translateY(-2px);
+		}
+
+		.feature-card .emoji {
+			font-size: 1.5rem;
+			display: block;
+			margin-bottom: 0.4rem;
+		}
+
+		.feature-card h3 {
+			font-size: 1rem;
+			font-weight: 600;
+			margin-bottom: 0.3rem;
+		}
+
+		.feature-card p {
+			font-size: 0.88rem;
+			color: #8b949e;
+			margin: 0;
+		}
+
+		/* ── Architecture ────────────────────────────────────── */
+		.tree {
+			background: #161b22;
+			border: 1px solid #21262d;
+			border-radius: 8px;
+			padding: 1.2rem 1.5rem;
+			font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+			font-size: 0.85rem;
+			line-height: 2;
+			overflow-x: auto;
+		}
+
+		.tree .dir {
+			color: #58a6ff;
+		}
+
+		.tree .file {
+			color: #c9d1d9;
+		}
+
+		.tree .comment {
+			color: #484f58;
+			font-style: italic;
+		}
+
+		.tree .highlight {
+			color: #d2a8ff;
+		}
+
+		/* ── Tools Table ─────────────────────────────────────── */
+		.tools-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+			gap: 0.8rem;
+		}
+
+		.tool-item {
+			background: #161b22;
+			border: 1px solid #21262d;
+			border-radius: 8px;
+			padding: 0.8rem 1rem;
+		}
+
+		.tool-item code {
+			font-family: 'SF Mono', 'Fira Code', monospace;
+			font-size: 0.9rem;
+			color: #7ee787;
+		}
+
+		.tool-item p {
+			font-size: 0.85rem;
+			color: #8b949e;
+			margin: 0.2rem 0 0;
+		}
+
+		/* ── Stack ────────────────────────────────────────────── */
+		.badges {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.6rem;
+		}
+
+		.badge {
+			padding: 0.3rem 0.8rem;
+			border-radius: 6px;
+			font-size: 0.85rem;
+			font-weight: 500;
+			background: #161b22;
+			border: 1px solid #21262d;
+			color: #c9d1d9;
+		}
+
+		.badge.bun {
+			border-color: #f9f9f922;
+			color: #f9f9f9;
+		}
+
+		.badge.ts {
+			border-color: #3178c644;
+			color: #3178c6;
+		}
+
+		.badge.ai {
+			border-color: #d2a8ff44;
+			color: #d2a8ff;
+		}
+
+		.badge.deepseek {
+			border-color: #4fc3f744;
+			color: #4fc3f7;
+		}
+
+		/* ── Commands ────────────────────────────────────────── */
+		.cmd-block {
+			background: #161b22;
+			border: 1px solid #21262d;
+			border-radius: 8px;
+			padding: 1rem 1.2rem;
+			margin-bottom: 1rem;
+		}
+
+		.cmd-block code {
+			display: block;
+			font-family: 'SF Mono', 'Fira Code', monospace;
+			font-size: 0.9rem;
+			color: #f9f9f9;
+		}
+
+		.cmd-block .prompt {
+			color: #484f58;
+		}
+
+		.cmd-block .desc {
+			font-size: 0.85rem;
+			color: #8b949e;
+			margin-top: 0.4rem;
+		}
+
+		/* ── Footer ──────────────────────────────────────────── */
+		footer {
+			margin-top: 4rem;
+			padding-top: 1.5rem;
+			border-top: 1px solid #21262d;
+			text-align: center;
+			font-size: 0.85rem;
+			color: #484f58;
+		}
+
+		footer a {
+			color: #58a6ff;
+			text-decoration: none;
+		}
+
+		footer a:hover {
+			text-decoration: underline;
+		}
+
+		/* ── Responsive ──────────────────────────────────────── */
+		@media (max-width: 600px) {
+			body {
+				padding: 1rem;
+			}
+			.hero .logo {
+				font-size: 1.6rem;
+			}
+			.hero .logo svg {
+				width: 32px;
+				height: 32px;
+			}
+		}
+	</style>
+</head>
+<body>
+	<div class="container">
+
+		<!-- ══════════ Hero ══════════ -->
+		<header class="hero">
+			<div class="logo">
+				<!-- 简约终端图标 -->
+				<svg viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="1.8"
+					stroke-linecap="round" stroke-linejoin="round">
+					<polyline points="4 17 10 11 4 5" />
+					<line x1="12" y1="19" x2="20" y2="19" />
+				</svg>
+				<span>mini-claude-code</span>
+			</div>
+			<p class="tagline">
+				一个运行在本地终端的轻量 Code Agent ——
+				能读写文件、执行命令、访问网络，帮你完成编程和开发任务。
+			</p>
+			<span class="version">v0.1.0 · 教学用途</span>
+		</header>
+
+		<!-- ══════════ 何为迷你 ⁉ ══════════ -->
+		<section class="section">
+			<h2><span class="icon">🤔</span> 何为 <em>mini-claude-code</em>？</h2>
+			<p>
+				这是一个精简版 <strong>Code Agent</strong>，灵感来自 Claude Code。
+				它通过多轮对话理解你的需求，自主调用工具来读写文件、执行 Shell 命令、
+				抓取网页，最终完成编程任务。
+			</p>
+			<p>
+				与 Claude Code 不同的是，<strong>mini-claude-code</strong> 完全开源、
+				代码量极小（~200 行核心逻辑），非常适合用来学习 Agent 的工作原理、
+				理解工具调用（Tool Calling）的设计模式。
+			</p>
+		</section>
+
+		<!-- ══════════ 核心功能 ══════════ -->
+		<section class="section">
+			<h2><span class="icon">⚡</span> 核心功能</h2>
+			<div class="features">
+				<div class="feature-card">
+					<span class="emoji">📖</span>
+					<h3>读取文件</h3>
+					<p>支持分段读取大文件，带行号预览，不撑爆上下文</p>
+				</div>
+				<div class="feature-card">
+					<span class="emoji">✍️</span>
+					<h3>写入文件</h3>
+					<p>创建新文件或完整覆盖已有文件</p>
+				</div>
+				<div class="feature-card">
+					<span class="emoji">🔧</span>
+					<h3>局部编辑</h3>
+					<p>通过精确匹配字符串实现局部替换，避免全量重写</p>
+				</div>
+				<div class="feature-card">
+					<span class="emoji">💻</span>
+					<h3>执行命令</h3>
+					<p>运行 Shell 命令，危险操作会暂停等待确认</p>
+				</div>
+				<div class="feature-card">
+					<span class="emoji">🌐</span>
+					<h3>抓取网页</h3>
+					<p>将网页内容转为 Markdown，方便查阅文档</p>
+				</div>
+				<div class="feature-card">
+					<span class="emoji">💬</span>
+					<h3>多轮对话</h3>
+					<p>维持对话历史，支持 /reset 重置、上下文压缩</p>
+				</div>
+			</div>
+		</section>
+
+		<!-- ══════════ 架构一览 ══════════ -->
+		<section class="section">
+			<h2><span class="icon">🏗️</span> 项目架构</h2>
+			<div class="tree">
+				<span class="dir">mini-claude-code/</span><br />
+				│<br />
+				├── <span class="highlight">src/</span><span class="comment">  ← 核心源代码</span><br />
+				│&nbsp;&nbsp;├── <span class="dir">agent/</span><br />
+				│&nbsp;&nbsp;│&nbsp;&nbsp;├── <span class="file">loop.ts</span><span class="comment">      Agent 循环核心</span><br />
+				│&nbsp;&nbsp;│&nbsp;&nbsp;├── <span class="file">context.ts</span><span class="comment">   上下文管理 &amp; 压缩</span><br />
+				│&nbsp;&nbsp;│&nbsp;&nbsp;├── <span class="file">prompt.ts</span><span class="comment">    提示词组装</span><br />
+				│&nbsp;&nbsp;│&nbsp;&nbsp;└── <span class="file">provider.ts</span><span class="comment">  模型提供商配置</span><br />
+				│&nbsp;&nbsp;├── <span class="dir">tools/</span><br />
+				│&nbsp;&nbsp;│&nbsp;&nbsp;├── <span class="file">index.ts</span><span class="comment">      工具注册</span><br />
+				│&nbsp;&nbsp;│&nbsp;&nbsp;├── <span class="file">read-file.ts</span><br />
+				│&nbsp;&nbsp;│&nbsp;&nbsp;├── <span class="file">write-file.ts</span><br />
+				│&nbsp;&nbsp;│&nbsp;&nbsp;├── <span class="file">edit-file.ts</span><br />
+				│&nbsp;&nbsp;│&nbsp;&nbsp;├── <span class="file">bash.ts</span><br />
+				│&nbsp;&nbsp;│&nbsp;&nbsp;└── <span class="file">web-fetch.ts</span><br />
+				│&nbsp;&nbsp;├── <span class="file">index.ts</span><span class="comment">        入口 / CLI 交互</span><br />
+				│&nbsp;&nbsp;└── <span class="file">SYSTEM_PROMPT.md</span><span class="comment">  系统提示词</span><br />
+				│<br />
+				├── <span class="file">package.json</span><br />
+				├── <span class="file">tsconfig.json</span><br />
+				└── <span class="file">.env</span><span class="comment">              API Key 配置</span>
+			</div>
+			<p style="margin-top:0.8rem;font-size:0.88rem;color:#8b949e;">
+				<strong>设计原则：</strong>先读后改 · 最小化操作 · 局部优先 · 不确定就问
+			</p>
+		</section>
+
+		<!-- ══════════ 可用工具 ══════════ -->
+		<section class="section">
+			<h2><span class="icon">🧰</span> 可用工具</h2>
+			<div class="tools-grid">
+				<div class="tool-item">
+					<code>read_file</code>
+					<p>分段读取文件内容</p>
+				</div>
+				<div class="tool-item">
+					<code>write_file</code>
+					<p>创建或覆盖文件</p>
+				</div>
+				<div class="tool-item">
+					<code>edit_file</code>
+					<p>精确字符串替换编辑</p>
+				</div>
+				<div class="tool-item">
+					<code>bash</code>
+					<p>执行 Shell 命令</p>
+				</div>
+				<div class="tool-item">
+					<code>web_fetch</code>
+					<p>抓取网页转 Markdown</p>
+				</div>
+			</div>
+		</section>
+
+		<!-- ══════════ 技术栈 ══════════ -->
+		<section class="section">
+			<h2><span class="icon">🛠️</span> 技术栈</h2>
+			<div class="badges">
+				<span class="badge bun">Bun 运行时</span>
+				<span class="badge ts">TypeScript</span>
+				<span class="badge ai">Vercel AI SDK</span>
+				<span class="badge deepseek">DeepSeek / OpenAI</span>
+				<span class="badge">Zod 校验</span>
+			</div>
+			<p style="margin-top:1rem;">
+				使用 <strong>Bun</strong> 作为运行时（比 Node.js 更快），
+				通过 <strong>Vercel AI SDK</strong> 接入大语言模型，
+				默认支持 <strong>DeepSeek</strong> 和 <strong>OpenAI</strong>
+				兼容接口，<strong>Zod</strong> 负责工具参数的校验。
+			</p>
+		</section>
+
+		<!-- ══════════ 快速上手 ══════════ -->
+		<section class="section">
+			<h2><span class="icon">🚀</span> 快速上手</h2>
+
+			<div class="cmd-block">
+				<code><span class="prompt"># 1. 安装依赖</span></code>
+				<code>bun install</code>
+			</div>
+
+			<div class="cmd-block">
+				<code><span class="prompt"># 2. 配置环境变量（.env）</span></code>
+				<code>DEEPSEEK_API_KEY=sk-xxxxxxxx</code>
+				<code>DEEPSEEK_BASE_URL=https://api.deepseek.com</code>
+			</div>
+
+			<div class="cmd-block">
+				<code><span class="prompt"># 3. 启动 Agent</span></code>
+				<code>bun start</code>
+				<div class="desc">进入交互式终端，即可开始对话</div>
+			</div>
+		</section>
+
+		<!-- ══════════ 设计理念 ══════════ -->
+		<section class="section">
+			<h2><span class="icon">🎯</span> 设计理念</h2>
+			<p>
+				<strong>mini-claude-code</strong> 是为学习而生的 Agent 教学示例。
+				它没有臃肿的依赖、没有复杂的抽象层，核心逻辑聚焦在
+				<strong>"Agent Loop — Tool Calling — Context Management"</strong>
+				这条主线上。
+			</p>
+			<p>
+				如果你想理解 LLM Agent 是如何工作的、想自己动手定制一个 Agent，
+				这个项目是最好的起点。
+			</p>
+		</section>
+
+		<!-- ══════════ Footer ══════════ -->
+		<footer>
+			<p>
+				mini-claude-code · 教学用途 ·
+				<a href="#">GitHub</a>
+			</p>
+			<p style="margin-top:0.3rem;">
+				灵感来自 <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>
+			</p>
+		</footer>
+
+	</div>
+</body>
+</html>
