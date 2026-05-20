@@ -1,4 +1,4 @@
-import { mkdir, readdir } from 'fs/promises';
+import { mkdir, readdir, unlink } from 'fs/promises';
 import { join } from 'path';
 import type { ModelMessage } from 'ai';
 import { isSensitivePath } from '../utils/safety';
@@ -58,6 +58,18 @@ export async function loadSession(name: string): Promise<SavedSession> {
 	}
 
 	return JSON.parse(await file.text()) as SavedSession;
+}
+
+export async function deleteSession(name: string): Promise<void> {
+	const safeName = normalizeSessionName(name);
+	const path = sessionPath(safeName);
+	const file = Bun.file(path);
+
+	if (!(await file.exists())) {
+		throw new Error(`会话不存在：${safeName}`);
+	}
+
+	await unlink(path);
 }
 
 export async function listSessions(): Promise<SavedSession[]> {

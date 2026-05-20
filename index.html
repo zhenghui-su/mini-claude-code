@@ -90,6 +90,10 @@
 			margin-bottom: 1rem;
 		}
 
+		.section p:last-child {
+			margin-bottom: 0;
+		}
+
 		/* ── Features Grid ───────────────────────────────────── */
 		.features {
 			display: grid;
@@ -220,13 +224,22 @@
 			color: #4fc3f7;
 		}
 
-		/* ── Commands ────────────────────────────────────────── */
+		.badge.openai {
+			border-color: #00a67e44;
+			color: #00a67e;
+		}
+
+		/* ── CLI Commands ─────────────────────────────────────── */
 		.cmd-block {
 			background: #161b22;
 			border: 1px solid #21262d;
 			border-radius: 8px;
 			padding: 1rem 1.2rem;
 			margin-bottom: 1rem;
+		}
+
+		.cmd-block:last-child {
+			margin-bottom: 0;
 		}
 
 		.cmd-block code {
@@ -286,7 +299,6 @@
 		<!-- ══════════ Hero ══════════ -->
 		<header class="hero">
 			<div class="logo">
-				<!-- 简约终端图标 -->
 				<svg viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="1.8"
 					stroke-linecap="round" stroke-linejoin="round">
 					<polyline points="4 17 10 11 4 5" />
@@ -295,24 +307,50 @@
 				<span>mini-claude-code</span>
 			</div>
 			<p class="tagline">
-				一个运行在本地终端的轻量 Code Agent ——
-				能读写文件、执行命令、访问网络，帮你完成编程和开发任务。
+				终端里的轻量级 AI 编程助手 —— 读懂需求，自主调用工具完成代码任务。
 			</p>
-			<span class="version">v0.1.0 · 教学用途</span>
+			<span class="version">v1.0.1 · 开源教学项目</span>
 		</header>
 
-		<!-- ══════════ 何为迷你 ⁉ ══════════ -->
+		<!-- ══════════ 简介 ══════════ -->
 		<section class="section">
-			<h2><span class="icon">🤔</span> 何为 <em>mini-claude-code</em>？</h2>
+			<h2><span class="icon">🤔</span> 这是什么？</h2>
 			<p>
-				这是一个精简版 <strong>Code Agent</strong>，灵感来自 Claude Code。
-				它通过多轮对话理解你的需求，自主调用工具来读写文件、执行 Shell 命令、
-				抓取网页，最终完成编程任务。
+				<strong>mini-claude-code</strong> 是一个极简的 <strong>Code Agent</strong> 教学示例，灵感来自 <a href="https://docs.anthropic.com/en/docs/claude-code" style="color:#58a6ff;text-decoration:none;">Claude Code</a>。
+				它运行在终端中，通过与大语言模型的多轮对话理解你的需求，自主调用工具完成任务。
 			</p>
 			<p>
-				与 Claude Code 不同的是，<strong>mini-claude-code</strong> 完全开源、
-				代码量极小（~200 行核心逻辑），非常适合用来学习 Agent 的工作原理、
-				理解工具调用（Tool Calling）的设计模式。
+				核心逻辑仅约 <strong>200 行</strong>代码，无臃肿依赖、无复杂抽象层。
+				非常适合用来理解 Agent 的工作原理和 <strong>Tool Calling</strong> 设计模式。
+			</p>
+		</section>
+
+		<!-- ══════════ 快速开始 ══════════ -->
+		<section class="section">
+			<h2><span class="icon">🚀</span> 快速开始</h2>
+			<p>确保已安装 <a href="https://bun.sh" style="color:#58a6ff;text-decoration:none;">Bun</a> 运行时，并在项目根目录创建 <code>.env</code> 文件配置 API Key：</p>
+
+			<div class="cmd-block">
+				<code><span class="prompt">$</span> bun install</code>
+				<div class="desc">安装依赖</div>
+			</div>
+
+			<div class="cmd-block">
+				<code><span class="prompt">$</span> bun src/index.ts</code>
+				<div class="desc">启动交互式 Agent</div>
+			</div>
+
+			<div class="cmd-block">
+				<code>
+<span class="prompt">$</span> cat .env<br/>
+DEEPSEEK_API_KEY=sk-xxxxxxxxxxxx<br/>
+DEEPSEEK_API_BASE_URL=https://api.deepseek.com
+				</code>
+				<div class="desc">环境变量配置（以 DeepSeek 为例）</div>
+			</div>
+
+			<p style="margin-top:1rem;font-size:0.9rem;color:#8b949e;">
+				💡 支持 DeepSeek / OpenAI 兼容接口，修改 <code>provider.ts</code> 即可切换。
 			</p>
 		</section>
 
@@ -323,7 +361,7 @@
 				<div class="feature-card">
 					<span class="emoji">📖</span>
 					<h3>读取文件</h3>
-					<p>支持分段读取大文件，带行号预览，不撑爆上下文</p>
+					<p>分段读取大文件，带行号预览，不撑爆上下文</p>
 				</div>
 				<div class="feature-card">
 					<span class="emoji">✍️</span>
@@ -333,64 +371,34 @@
 				<div class="feature-card">
 					<span class="emoji">🔧</span>
 					<h3>局部编辑</h3>
-					<p>通过精确匹配字符串实现局部替换，避免全量重写</p>
+					<p>精确匹配字符串实现局部替换，避免全量重写</p>
+				</div>
+				<div class="feature-card">
+					<span class="emoji">🔍</span>
+					<h3>搜索内容</h3>
+					<p>在项目中搜索文本或符号，快速定位代码</p>
 				</div>
 				<div class="feature-card">
 					<span class="emoji">💻</span>
 					<h3>执行命令</h3>
-					<p>运行 Shell 命令，危险操作会暂停等待确认</p>
+					<p>运行 Shell 命令并获取输出，安全拦截危险操作</p>
 				</div>
 				<div class="feature-card">
 					<span class="emoji">🌐</span>
 					<h3>抓取网页</h3>
-					<p>将网页内容转为 Markdown，方便查阅文档</p>
-				</div>
-				<div class="feature-card">
-					<span class="emoji">💬</span>
-					<h3>多轮对话</h3>
-					<p>维持对话历史，支持 /reset 重置、上下文压缩</p>
+					<p>获取在线文档或 API 响应，转为 Markdown</p>
 				</div>
 			</div>
 		</section>
 
-		<!-- ══════════ 架构一览 ══════════ -->
-		<section class="section">
-			<h2><span class="icon">🏗️</span> 项目架构</h2>
-			<div class="tree">
-				<span class="dir">mini-claude-code/</span><br />
-				│<br />
-				├── <span class="highlight">src/</span><span class="comment">  ← 核心源代码</span><br />
-				│&nbsp;&nbsp;├── <span class="dir">agent/</span><br />
-				│&nbsp;&nbsp;│&nbsp;&nbsp;├── <span class="file">loop.ts</span><span class="comment">      Agent 循环核心</span><br />
-				│&nbsp;&nbsp;│&nbsp;&nbsp;├── <span class="file">context.ts</span><span class="comment">   上下文管理 &amp; 压缩</span><br />
-				│&nbsp;&nbsp;│&nbsp;&nbsp;├── <span class="file">prompt.ts</span><span class="comment">    提示词组装</span><br />
-				│&nbsp;&nbsp;│&nbsp;&nbsp;└── <span class="file">provider.ts</span><span class="comment">  模型提供商配置</span><br />
-				│&nbsp;&nbsp;├── <span class="dir">tools/</span><br />
-				│&nbsp;&nbsp;│&nbsp;&nbsp;├── <span class="file">index.ts</span><span class="comment">      工具注册</span><br />
-				│&nbsp;&nbsp;│&nbsp;&nbsp;├── <span class="file">read-file.ts</span><br />
-				│&nbsp;&nbsp;│&nbsp;&nbsp;├── <span class="file">write-file.ts</span><br />
-				│&nbsp;&nbsp;│&nbsp;&nbsp;├── <span class="file">edit-file.ts</span><br />
-				│&nbsp;&nbsp;│&nbsp;&nbsp;├── <span class="file">bash.ts</span><br />
-				│&nbsp;&nbsp;│&nbsp;&nbsp;└── <span class="file">web-fetch.ts</span><br />
-				│&nbsp;&nbsp;├── <span class="file">index.ts</span><span class="comment">        入口 / CLI 交互</span><br />
-				│&nbsp;&nbsp;└── <span class="file">SYSTEM_PROMPT.md</span><span class="comment">  系统提示词</span><br />
-				│<br />
-				├── <span class="file">package.json</span><br />
-				├── <span class="file">tsconfig.json</span><br />
-				└── <span class="file">.env</span><span class="comment">              API Key 配置</span>
-			</div>
-			<p style="margin-top:0.8rem;font-size:0.88rem;color:#8b949e;">
-				<strong>设计原则：</strong>先读后改 · 最小化操作 · 局部优先 · 不确定就问
-			</p>
-		</section>
-
-		<!-- ══════════ 可用工具 ══════════ -->
+		<!-- ══════════ 工具列表 ══════════ -->
 		<section class="section">
 			<h2><span class="icon">🧰</span> 可用工具</h2>
+			<p>Agent 在循环中可自主调用以下工具：</p>
 			<div class="tools-grid">
 				<div class="tool-item">
 					<code>read_file</code>
-					<p>分段读取文件内容</p>
+					<p>读取文件内容（支持 offset/limit）</p>
 				</div>
 				<div class="tool-item">
 					<code>write_file</code>
@@ -398,7 +406,15 @@
 				</div>
 				<div class="tool-item">
 					<code>edit_file</code>
-					<p>精确字符串替换编辑</p>
+					<p>精确替换文件中的内容</p>
+				</div>
+				<div class="tool-item">
+					<code>search</code>
+					<p>搜索项目中的文本或符号</p>
+				</div>
+				<div class="tool-item">
+					<code>list_files</code>
+					<p>浏览项目目录结构</p>
 				</div>
 				<div class="tool-item">
 					<code>bash</code>
@@ -406,8 +422,41 @@
 				</div>
 				<div class="tool-item">
 					<code>web_fetch</code>
-					<p>抓取网页转 Markdown</p>
+					<p>抓取网页并转为 Markdown</p>
 				</div>
+			</div>
+		</section>
+
+		<!-- ══════════ 架构 ══════════ -->
+		<section class="section">
+			<h2><span class="icon">🏗️</span> 项目架构</h2>
+			<p>代码结构清晰，每个模块职责单一：</p>
+			<div class="tree">
+				<span class="dir">src/</span><br/>
+				&nbsp;&nbsp;├─ <span class="dir">agent/</span> &nbsp;<span class="comment"># Agent 核心循环</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">loop.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 模型调用 ↔ 工具回填 → 步骤输出</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">context.ts</span> &nbsp;&nbsp;&nbsp;<span class="comment"># 上下文压缩</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">session.ts</span> &nbsp;&nbsp;&nbsp;<span class="comment"># 会话保存 / 恢复</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">prompt.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 系统提示词组装</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;└─ <span class="file">provider.ts</span> &nbsp;&nbsp;<span class="comment"># 模型提供商配置</span><br/>
+				&nbsp;&nbsp;├─ <span class="dir">tools/</span> &nbsp;&nbsp;<span class="comment"># 工具定义 &amp; 注册</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">index.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 工具注册入口</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">bash.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Shell 执行</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">edit-file.ts</span> &nbsp;&nbsp;<span class="comment"># 局部编辑</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">list-files.ts</span> &nbsp;<span class="comment"># 目录浏览</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">read-file.ts</span> &nbsp;&nbsp;<span class="comment"># 文件读取</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">search.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 文本搜索</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">web-fetch.ts</span> &nbsp;<span class="comment"># 网页抓取</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;└─ <span class="file">write-file.ts</span> &nbsp;<span class="comment"># 文件写入</span><br/>
+				&nbsp;&nbsp;├─ <span class="file">index.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 入口</span><br/>
+				&nbsp;&nbsp;└─ <span class="dir">utils/</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 辅助函数</span><br/>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├─ <span class="file">confirm.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 用户确认交互</span><br/>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├─ <span class="file">safety.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 命令安全检测</span><br/>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└─ <span class="file">truncate.ts</span> &nbsp;&nbsp;&nbsp;<span class="comment"># 输出截断</span><br/>
+				<br/>
+				<span class="dir">bin/</span><br/>
+				&nbsp;&nbsp;└─ <span class="file">minicc.cjs</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># CLI 入口</span><br/>
+				<span class="dir">tests/</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 单元测试</span>
 			</div>
 		</section>
 
@@ -417,63 +466,39 @@
 			<div class="badges">
 				<span class="badge bun">Bun 运行时</span>
 				<span class="badge ts">TypeScript</span>
-				<span class="badge ai">Vercel AI SDK</span>
-				<span class="badge deepseek">DeepSeek / OpenAI</span>
+				<span class="badge ai">AI SDK</span>
+				<span class="badge deepseek">DeepSeek</span>
+				<span class="badge openai">OpenAI 兼容</span>
 				<span class="badge">Zod 校验</span>
 			</div>
-			<p style="margin-top:1rem;">
-				使用 <strong>Bun</strong> 作为运行时（比 Node.js 更快），
-				通过 <strong>Vercel AI SDK</strong> 接入大语言模型，
-				默认支持 <strong>DeepSeek</strong> 和 <strong>OpenAI</strong>
-				兼容接口，<strong>Zod</strong> 负责工具参数的校验。
-			</p>
 		</section>
 
-		<!-- ══════════ 快速上手 ══════════ -->
+		<!-- ══════════ 构建安装 ══════════ -->
 		<section class="section">
-			<h2><span class="icon">🚀</span> 快速上手</h2>
+			<h2><span class="icon">📦</span> 构建 &amp; 全局安装</h2>
 
 			<div class="cmd-block">
-				<code><span class="prompt"># 1. 安装依赖</span></code>
-				<code>bun install</code>
+				<code><span class="prompt">$</span> bun run build</code>
+				<div class="desc">构建到 <code>dist/index.js</code></div>
 			</div>
 
 			<div class="cmd-block">
-				<code><span class="prompt"># 2. 配置环境变量（.env）</span></code>
-				<code>DEEPSEEK_API_KEY=sk-xxxxxxxx</code>
-				<code>DEEPSEEK_BASE_URL=https://api.deepseek.com</code>
+				<code><span class="prompt">$</span> bun run build:binary</code>
+				<div class="desc">编译为单文件二进制 <code>dist/minicc</code></div>
 			</div>
 
 			<div class="cmd-block">
-				<code><span class="prompt"># 3. 启动 Agent</span></code>
-				<code>bun start</code>
-				<div class="desc">进入交互式终端，即可开始对话</div>
+				<code><span class="prompt">$</span> bun run link:global</code>
+				<div class="desc">全局安装，终端可直接使用 <code>minicc</code> 命令</div>
 			</div>
 		</section>
 
-		<!-- ══════════ 设计理念 ══════════ -->
-		<section class="section">
-			<h2><span class="icon">🎯</span> 设计理念</h2>
-			<p>
-				<strong>mini-claude-code</strong> 是为学习而生的 Agent 教学示例。
-				它没有臃肿的依赖、没有复杂的抽象层，核心逻辑聚焦在
-				<strong>"Agent Loop — Tool Calling — Context Management"</strong>
-				这条主线上。
-			</p>
-			<p>
-				如果你想理解 LLM Agent 是如何工作的、想自己动手定制一个 Agent，
-				这个项目是最好的起点。
-			</p>
-		</section>
-
-		<!-- ══════════ Footer ══════════ -->
+		<!-- ══════════ 开源许可 ══════════ -->
 		<footer>
 			<p>
-				mini-claude-code · 教学用途 ·
-				<a href="#">GitHub</a>
-			</p>
-			<p style="margin-top:0.3rem;">
-				灵感来自 <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>
+				<a href="https://github.com">GitHub</a> ·
+				MIT License ·
+				Made for learning &amp; teaching
 			</p>
 		</footer>
 

@@ -4,6 +4,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import {
 	listSessions,
+	deleteSession,
 	loadSession,
 	saveSession,
 	summarizeSession,
@@ -57,6 +58,18 @@ test('saveSession stores a preview of the latest assistant reply', async () => {
 		cwd: realTempDir,
 		lastReplyPreview: 'latest answer with useful context',
 	});
+});
+
+test('deleteSession removes a saved session', async () => {
+	await saveSession('remove me', {
+		history: [{ role: 'user', content: 'temporary' }],
+		runtimeHints: [],
+	});
+
+	await deleteSession('remove-me');
+
+	expect(await listSessions()).toEqual([]);
+	await expect(loadSession('remove-me')).rejects.toThrow('会话不存在');
 });
 
 test('saveSession redacts sensitive tool output content', async () => {

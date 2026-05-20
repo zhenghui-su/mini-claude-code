@@ -11,7 +11,7 @@ import { assembleSystemPrompt } from './prompt';
 import { TOOLS } from '../tools';
 import { getToolResultMessage } from '../tools/result';
 
-const MAX_AGENT_STEPS = 20;
+const MAX_AGENT_STEPS = 50;
 
 export interface RunResult {
 	text: string;
@@ -141,9 +141,7 @@ function printStep({ text, toolCalls, toolResults }: StepInfo) {
 
 	for (const result of toolResults) {
 		const outputPreview = formatPreview(result.output);
-		console.log(
-			`\x1b[90m↳ ${result.toolName} 结果 ${outputPreview}\x1b[0m`,
-		);
+		console.log(`\x1b[90m↳ ${result.toolName} 结果 ${outputPreview}\x1b[0m`);
 	}
 }
 
@@ -151,8 +149,7 @@ function formatPreview(value: unknown): string {
 	const toolMessage = getToolResultMessage(value);
 	if (toolMessage) return compactPreview(toolMessage);
 
-	const text =
-		typeof value === 'string' ? value : JSON.stringify(value ?? {});
+	const text = typeof value === 'string' ? value : JSON.stringify(value ?? {});
 
 	return compactPreview(text);
 }

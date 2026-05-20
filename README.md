@@ -20,6 +20,14 @@ DEEPSEEK_API_BASE_URL=https://api.deepseek.com
 
 ```sh
 src/
+├── cli/
+│   ├── app.ts               # CLI 应用状态、命令分发和多轮输入
+│   ├── constants.ts         # 提示符与 slash 命令定义
+│   ├── format.ts            # 终端展示、时间和宽字符格式化
+│   ├── help.ts              # 帮助与版本说明
+│   ├── resume.ts            # 历史会话选择/恢复界面
+│   ├── slash.ts             # slash 命令匹配与解析
+│   └── working-indicator.ts # 执行中动画
 ├── agent/
 │   ├── loop.ts       # Agent 循环：模型调用、工具回填、步骤输出
 │   ├── context.ts    # 上下文压缩
