@@ -29,5 +29,6 @@ test('slash command selection cycles and completes the selected command', () => 
 	expect(moveSlashSelection('/c', 0, -1)).toBe(1);
 	expect(completeSlashInput('/c', 1)).toBe('/compact');
 	expect(completeSlashInput('/p', 0)).toBe('/plan ');
+	expect(completeSlashInput('/m', 0)).toBe('/model');
 	expect(completeSlashInput('hello', 0)).toBeUndefined();
 });

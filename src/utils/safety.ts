@@ -72,6 +72,7 @@ export function resolveSafePath(inputPath: string): string {
 
 const SENSITIVE_PATTERNS: RegExp[] = [
 	/\.env(\.|$)/, // .env 文件
+	/\.mini-claude\/models\.json$/, // 本地模型 API Key 配置
 	/\.aws\/credentials/, // AWS 凭证
 	/\.ssh\/(id_rsa|id_ed25519)$/, // SSH 私钥
 	/secrets?\.(json|yaml|yml)$/i, // secrets 文件

@@ -1,6 +1,6 @@
 import type { LanguageModelUsage, ModelMessage } from 'ai';
 import { generateText } from 'ai';
-import { MODEL_ID, model } from './provider';
+import { MODEL_ID, resolveLanguageModel } from './provider';
 
 export const DEFAULT_CONTEXT_LIMIT = 128_000;
 const COMPRESS_THRESHOLD = 0.8;
@@ -77,14 +77,16 @@ export async function compactContext({
 	history,
 	context,
 	reason,
-	compressor = compressHistory,
+	compressor,
 	now = new Date().toISOString(),
 }: CompactContextOptions): Promise<CompactContextResult> {
 	if (!hasCompressibleHistory(history)) {
 		throw new Error('当前没有可压缩的历史记录');
 	}
 
-	const summary = (await compressor(history)).trim();
+	const summarize =
+		compressor ?? ((messages: ModelMessage[]) => compressHistory(messages, context));
+	const summary = (await summarize(history)).trim();
 	if (!summary) {
 		throw new Error('压缩结果为空');
 	}
@@ -168,6 +170,7 @@ export function extractLegacySummary(runtimeHints: string[]): string | undefined
 // 摘要要能支撑下一轮继续工作：不追求"漂亮"，追求"够用"
 export async function compressHistory(
 	history: ModelMessage[],
+	context: ContextSnapshot = createContextSnapshot(),
 ): Promise<string> {
 	const COMPRESS_SYSTEM = `
 你是一个 Agent 执行历史压缩器。将以下执行历史总结为结构化摘要，输出格式如下（使用 XML 标签）：
@@ -202,7 +205,7 @@ export async function compressHistory(
 		.join('\n\n---\n\n');
 
 	const { text } = await generateText({
-		model,
+		model: await resolveLanguageModel(context.modelId),
 		system: COMPRESS_SYSTEM,
 		prompt: historyText,
 	});

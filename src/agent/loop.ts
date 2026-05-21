@@ -6,7 +6,7 @@ import {
 	type TypedToolCall,
 	type TypedToolResult,
 } from 'ai';
-import { model } from './provider';
+import { resolveLanguageModel } from './provider';
 import { assembleSystemPrompt } from './prompt';
 import type { ContextSnapshot } from './context';
 import { TOOLS } from '../tools';
@@ -41,7 +41,7 @@ export async function createExecutionPlan(
 	]);
 
 	const { text } = await generateText({
-		model,
+		model: await resolveLanguageModel(context.modelId),
 		system,
 		messages: [
 			...history,
@@ -72,7 +72,7 @@ export async function agentLoop(
 	];
 
 	const result = await generateText({
-		model,
+		model: await resolveLanguageModel(context.modelId),
 		system,
 		messages,
 		tools: TOOLS,

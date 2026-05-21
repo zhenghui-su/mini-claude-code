@@ -9,9 +9,15 @@ bun install
 bun src/index.ts
 ```
 
-需要在 `.env` 中配置：
+首次启动如果没有可用模型，会先进入新增模型流程。你也可以提前在 `.env` 中配置官方模型凭据：
 
 ```sh
+OPENAI_API_KEY=...
+OPENAI_MODEL_ID=gpt-4.1
+ANTHROPIC_API_KEY=...
+ANTHROPIC_MODEL_ID=claude-sonnet-4-5
+
+# 可选：新增 DeepSeek 官方模型时可以留空 API Key，改用环境变量读取
 DEEPSEEK_API_KEY=...
 DEEPSEEK_API_BASE_URL=https://api.deepseek.com
 ```
@@ -81,15 +87,30 @@ CLI 会在每轮输入前显示 HUD，展示当前模型、最近 prompt token �
 
 ## Commands
 
-输入 `/` 会在当前输入行下方显示命令菜单；继续输入字母会按前缀过滤，例如 `/p` 只显示 `/plan`。菜单只做提示，不会自动补全，命令仍由用户手动输入完整。
+输入 `/` 会在当前输入行下方显示命令菜单；继续输入字母会按前缀过滤，例如 `/p` 只显示 `/plan`。可以用 `↑/↓` 选择命令，按 `Tab` 补全当前选中的命令。
 
 - `/help`：查看帮助。
 - `/plan <任务>`：只对本轮开启计划模式，先生成执行计划，用户确认后才继续执行。输入框里 `/plan` 会高亮；不加 `/plan` 就是普通模式。
 - `/context`：查看当前上下文状态、token 用量、压缩次数和摘要情况。
 - `/compact`：立即压缩当前上下文，把历史折叠成结构化摘要。
+- `/model`：打开模型选择器，支持切换、新增、修改和删除自定义模型。
 - `/sessions`：列出已保存会话。
 - `/reset`：清空当前会话历史。
 - `/exit`：退出。
+
+## Models
+
+`/model` 会打开模型选择器，列表里包含环境变量配置的官方 OpenAI / Anthropic 模型、`.mini-claude/models.json` 中保存的自定义模型，以及“新增模型”入口。DeepSeek 不再默认注入为内置模型，需要通过 `/model` 新增后才会出现在列表中。
+
+如果当前目录下没有任何可用模型，程序启动后会先要求新增一个模型，再进入对话输入。
+
+打开模型选择器：
+
+```txt
+/model
+```
+
+使用 `↑/↓` 选择，`Enter` 对已有模型执行切换；选中“新增模型”后会按提示选择接口格式并填写模型 ID、Base URL、API Key。模型列表中 `e` 可修改自定义模型，`d` 可删除自定义模型。新增或修改过程中按 `←` 返回上一步，按 `→` 进入下一步，按 `Esc` 取消，`Ctrl+U` 可清空可选字段。新增后会自动切换到该模型。自定义模型的 API Key 保存在当前项目的 `.mini-claude/models.json`，该文件会被识别为敏感文件。
 
 ## Sessions
 

@@ -8,18 +8,32 @@ import {
 import {
 	compactContext,
 	createContextSnapshot,
+	DEFAULT_CONTEXT_LIMIT,
 	recordUsage,
 	shouldCompress,
 	type CompressionReason,
 	type ContextSnapshot,
 } from '../agent/context';
 import {
+	addModelProfile,
+	deleteModelProfile,
+	hasModelCredential,
+	isStoredModelProfile,
+	listUsableModelProfiles,
+	normalizeModelProfile,
+	type ModelProfile,
+	type ModelProviderKind,
+} from '../agent/provider';
+import {
 	createSessionName,
 	listSessions,
 	saveSession,
 	summarizeSession,
 } from '../agent/session';
-import { confirmQuestion } from '../utils/confirm';
+import {
+	askKeyedQuestion,
+	confirmQuestion,
+} from '../utils/confirm';
 import packageJson from '../../package.json';
 import {
 	displayWidth,
@@ -33,6 +47,7 @@ import {
 } from './format';
 import { printCliHelp, printHelp } from './help';
 import { renderInputBox } from './input-box';
+import { chooseModel, chooseModelProvider } from './model';
 import { chooseSession, printSessionTranscript } from './resume';
 import {
 	completeSlashInput,
@@ -54,6 +69,29 @@ export async function runCli() {
 	process.stdin.on('keypress', app.handleKeypress);
 	process.stdout.on('resize', app.handleResize);
 	await app.bootstrap();
+}
+
+type ModelFormResult = 'saved' | 'cancel' | 'back';
+type ModelFormStep =
+	| 'provider'
+	| 'modelId'
+	| 'id'
+	| 'baseURL'
+	| 'apiKey'
+	| 'contextLimit';
+type ModelFieldResult =
+	| { type: 'submit'; value: string }
+	| { type: 'clear' }
+	| { type: 'back' }
+	| { type: 'cancel' };
+
+interface ModelFormState {
+	provider: ModelProviderKind;
+	modelId: string;
+	id: string;
+	baseURL: string;
+	apiKey: string;
+	contextLimit: string;
 }
 
 class CliApp {
@@ -170,6 +208,10 @@ class CliApp {
 			this.history = session.history;
 			this.context = session.context;
 			printSessionTranscript(session);
+			if (!(await this.ensureUsableModelConfigured())) {
+				this.closeWithoutMessage();
+				return;
+			}
 			this.startInput();
 			return;
 		} else if (command && command !== 'start') {
@@ -177,6 +219,10 @@ class CliApp {
 			console.log('用法：minicc [resume|--help|-V]');
 		}
 
+		if (!(await this.ensureUsableModelConfigured())) {
+			this.closeWithoutMessage();
+			return;
+		}
 		this.startInput();
 	}
 
@@ -223,6 +269,12 @@ class CliApp {
 
 		if (question === '/context') {
 			this.printContextDetails();
+			this.startInput();
+			return;
+		}
+
+		if (question === '/model') {
+			await this.handleModelCommand();
 			this.startInput();
 			return;
 		}
@@ -362,6 +414,8 @@ class CliApp {
 	}
 
 	private async saveCurrentSession() {
+		if (this.history.length === 0) return;
+
 		try {
 			await saveSession(this.currentSessionName, {
 				history: this.history,
@@ -372,6 +426,30 @@ class CliApp {
 				theme.warningStatus(`会话保存失败: ${(e as Error).message}`),
 			);
 		}
+	}
+
+	private async ensureUsableModelConfigured(): Promise<boolean> {
+		const usableProfiles = await listUsableModelProfiles();
+		if (usableProfiles.length > 0) {
+			if (!usableProfiles.some((profile) => profile.id === this.context.modelId)) {
+				const profile = usableProfiles[0];
+				if (profile) {
+					this.context = createContextSnapshot({
+						...this.context,
+						modelId: profile.id,
+						contextLimit: profile.contextLimit,
+					});
+				}
+			}
+			return true;
+		}
+
+		console.log(theme.warningStatus('未发现可用模型，请先新增模型'));
+		const result = await this.addModelInteractively();
+		if (result === 'saved') return true;
+
+		console.log(theme.warningStatus('未配置可用模型，无法开始对话'));
+		return false;
 	}
 
 	private startInput() {
@@ -477,6 +555,334 @@ class CliApp {
 			this.context.lastPromptTokens,
 			this.context.contextLimit,
 		);
+	}
+
+	private async handleModelCommand() {
+		try {
+			while (true) {
+				const result = await chooseModel(this.context.modelId);
+				if (!result) {
+					console.log(theme.status('已取消模型选择'));
+					return;
+				}
+
+				if (result.type === 'add') {
+					const formResult = await this.addModelInteractively();
+					if (formResult === 'back') continue;
+					return;
+				}
+
+				if (result.type === 'edit') {
+					const formResult = await this.editModelInteractively(result.profile);
+					if (formResult === 'back') continue;
+					return;
+				}
+
+				if (result.type === 'delete') {
+					await this.deleteModelInteractively(result.profile);
+					return;
+				}
+
+				await this.switchModel(result.profile);
+				return;
+			}
+		} catch (e) {
+			console.log(theme.warningStatus((e as Error).message));
+		}
+	}
+
+	private async switchModel(profile: ModelProfile) {
+		if (!hasModelCredential(profile)) {
+			console.log(theme.warningStatus(`模型 ${profile.id} 缺少 API Key`));
+			return;
+		}
+
+		this.context = createContextSnapshot({
+			...this.context,
+			modelId: profile.id,
+			contextLimit: profile.contextLimit,
+		});
+		await this.saveCurrentSession();
+		console.log(theme.status(`已切换模型：${profile.id}`));
+	}
+
+	private async addModelInteractively(
+		providerHint?: ModelProviderKind,
+	): Promise<ModelFormResult> {
+		return this.upsertModelInteractively({
+			mode: 'add',
+			providerHint,
+		});
+	}
+
+	private async editModelInteractively(
+		profile: ModelProfile,
+	): Promise<ModelFormResult> {
+		if (!(await isStoredModelProfile(profile.id))) {
+			console.log(theme.warningStatus('内置模型不能在这里修改，请调整环境变量'));
+			return 'cancel';
+		}
+
+		return this.upsertModelInteractively({
+			mode: 'edit',
+			profile,
+		});
+	}
+
+	private async upsertModelInteractively(options: {
+		mode: 'add' | 'edit';
+		providerHint?: ModelProviderKind;
+		profile?: ModelProfile;
+	}): Promise<ModelFormResult> {
+		const existing = options.profile;
+		const state: ModelFormState = {
+			provider:
+				existing?.provider ?? options.providerHint ?? 'openai-compatible',
+			modelId: existing?.modelId ?? '',
+			id: existing?.id ?? '',
+			baseURL: existing?.baseURL ?? '',
+			apiKey: existing?.apiKey ?? '',
+			contextLimit: String(existing?.contextLimit ?? DEFAULT_CONTEXT_LIMIT),
+		};
+		let step: ModelFormStep = 'provider';
+
+		console.log(theme.status('← 返回上一步，→ 下一步，Esc 取消，Ctrl+U 清空可选字段'));
+		while (true) {
+			if (step === 'provider') {
+				const provider = await this.askProviderKind(state.provider);
+				if (!provider) {
+					console.log(theme.status('已取消模型配置'));
+					return 'cancel';
+				}
+
+				state.provider = provider;
+				step = 'modelId';
+				continue;
+			}
+
+			if (step === 'modelId') {
+				const result = await this.askModelField('模型 ID', state.modelId);
+				if (result.type === 'cancel') return this.cancelModelConfig();
+				if (result.type === 'back') {
+					step = 'provider';
+					continue;
+				}
+				if (result.type === 'clear' || !result.value.trim()) {
+					console.log(theme.warningStatus('模型 ID 不能为空'));
+					continue;
+				}
+				state.modelId = result.value.trim();
+				step = 'id';
+				continue;
+			}
+
+			if (step === 'id') {
+				const defaultId = state.id || `${state.provider}:${state.modelId}`;
+				const result = await this.askModelField('模型名称/别名', '', {
+					defaultValue: defaultId,
+				});
+				if (result.type === 'cancel') return this.cancelModelConfig();
+				if (result.type === 'back') {
+					step = 'modelId';
+					continue;
+				}
+				if (result.type === 'clear') {
+					state.id = '';
+				} else {
+					state.id = result.value.trim() || defaultId;
+				}
+				step = 'baseURL';
+				continue;
+			}
+
+			if (step === 'baseURL') {
+				const result = await this.askModelField(
+					state.provider.endsWith('compatible')
+						? 'Base URL'
+						: 'Base URL（官方默认可留空）',
+					state.baseURL,
+					{ allowClear: true },
+				);
+				if (result.type === 'cancel') return this.cancelModelConfig();
+				if (result.type === 'back') {
+					step = 'id';
+					continue;
+				}
+				state.baseURL =
+					result.type === 'clear' ? '' : result.value.trim();
+				if (state.provider.endsWith('compatible') && !state.baseURL) {
+					console.log(theme.warningStatus('兼容接口模型必须填写 Base URL'));
+					continue;
+				}
+				step = 'apiKey';
+				continue;
+			}
+
+			if (step === 'apiKey') {
+				const result = await this.askModelField(
+					state.provider.endsWith('compatible')
+						? 'API Key'
+						: 'API Key（留空使用环境变量）',
+					state.apiKey,
+					{ allowClear: true, maskCurrent: true },
+				);
+				if (result.type === 'cancel') return this.cancelModelConfig();
+				if (result.type === 'back') {
+					step = 'baseURL';
+					continue;
+				}
+				state.apiKey = result.type === 'clear' ? '' : result.value.trim();
+				if (state.provider.endsWith('compatible') && !state.apiKey) {
+					console.log(theme.warningStatus('兼容接口模型必须填写 API Key'));
+					continue;
+				}
+				step = 'contextLimit';
+				continue;
+			}
+
+			const result = await this.askModelField(
+				'上下文上限',
+				state.contextLimit || String(DEFAULT_CONTEXT_LIMIT),
+			);
+			if (result.type === 'cancel') return this.cancelModelConfig();
+			if (result.type === 'back') {
+				step = 'apiKey';
+				continue;
+			}
+			if (result.type !== 'clear') state.contextLimit = result.value.trim();
+
+			const profile = normalizeModelProfile({
+				id: state.id || `${state.provider}:${state.modelId}`,
+				provider: state.provider,
+				modelId: state.modelId,
+				baseURL: state.baseURL,
+				apiKey: state.apiKey,
+				contextLimit: state.contextLimit
+					? Number(state.contextLimit)
+					: DEFAULT_CONTEXT_LIMIT,
+				createdAt: existing?.createdAt,
+			});
+			if (!hasModelCredential(profile)) {
+				console.log(
+					theme.warningStatus('未填写 API Key，且没有可用的对应环境变量'),
+				);
+				step = 'apiKey';
+				continue;
+			}
+
+			const saved = await addModelProfile(profile);
+			if (existing && existing.id !== saved.id) {
+				await deleteModelProfile(existing.id);
+			}
+
+			if (options.mode === 'add' || this.context.modelId === existing?.id) {
+				this.context = createContextSnapshot({
+					...this.context,
+					modelId: saved.id,
+					contextLimit: saved.contextLimit,
+				});
+				await this.saveCurrentSession();
+			}
+
+			console.log(
+				theme.status(
+					options.mode === 'add'
+						? `已新增并切换模型：${saved.id}`
+						: `已修改模型：${saved.id}`,
+				),
+			);
+			return 'saved';
+		}
+	}
+
+	private async deleteModelInteractively(profile: ModelProfile): Promise<void> {
+		if (!(await isStoredModelProfile(profile.id))) {
+			console.log(theme.warningStatus('内置模型不能在这里删除，请调整环境变量'));
+			return;
+		}
+
+		const confirmed = await confirmQuestion(
+			`确认删除模型 ${profile.id}? (y/N) `,
+		);
+		if (!confirmed) {
+			console.log(theme.status('已取消删除模型'));
+			return;
+		}
+
+		const deleted = await deleteModelProfile(profile.id);
+		if (!deleted) {
+			console.log(theme.warningStatus(`模型不存在：${profile.id}`));
+			return;
+		}
+
+		if (this.context.modelId === profile.id) {
+			const fallback = (await listUsableModelProfiles())[0];
+			if (fallback) {
+				this.context = createContextSnapshot({
+					...this.context,
+					modelId: fallback.id,
+					contextLimit: fallback.contextLimit,
+				});
+				await this.saveCurrentSession();
+				console.log(
+					theme.status(
+						`已删除模型：${profile.id}，当前模型已切换为 ${fallback.id}`,
+					),
+				);
+				return;
+			}
+
+			console.log(theme.status(`已删除模型：${profile.id}`));
+			if (!(await this.ensureUsableModelConfigured())) {
+				this.closeWithoutMessage();
+			}
+			return;
+		}
+
+		console.log(theme.status(`已删除模型：${profile.id}`));
+	}
+
+	private async askProviderKind(
+		providerHint?: ModelProviderKind,
+	): Promise<ModelProviderKind | undefined> {
+		const result = await chooseModelProvider(providerHint ?? 'openai-compatible');
+		if (!result) return undefined;
+		return result.provider;
+	}
+
+	private async askModelField(
+		label: string,
+		currentValue: string,
+		options: {
+			allowClear?: boolean;
+			maskCurrent?: boolean;
+			defaultValue?: string;
+		} = {},
+	): Promise<ModelFieldResult> {
+		const current = currentValue.trim();
+		const defaultDisplay = options.defaultValue?.trim();
+		const valueHint = defaultDisplay ? `（默认 ${defaultDisplay}）` : '';
+		const prompt = `${label}${valueHint}: `;
+		const result = await askKeyedQuestion(prompt, {
+			initialValue: options.maskCurrent ? '' : current,
+			allowClear: options.allowClear,
+		});
+
+		if (result.type === 'cancel') return { type: 'cancel' };
+		if (result.type === 'back') return { type: 'back' };
+		if (result.type === 'clear') return { type: 'clear' };
+		if (options.maskCurrent && !result.value.trim() && current) {
+			return { type: 'submit', value: current };
+		}
+		if (!result.value.trim() && defaultDisplay) {
+			return { type: 'submit', value: defaultDisplay };
+		}
+		return { type: 'submit', value: result.value };
+	}
+
+	private cancelModelConfig(): ModelFormResult {
+		console.log(theme.status('已取消模型配置'));
+		return 'cancel';
 	}
 
 	private printContextDetails() {
