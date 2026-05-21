@@ -5,4 +5,6 @@ const deepseek = createDeepSeek({
 	baseURL: process.env.DEEPSEEK_API_BASE_URL! || 'https://api.deepseek.com',
 });
 
-export const model = deepseek('deepseek-chat');
+export const MODEL_ID = 'deepseek-chat';
+
+export const model = deepseek(MODEL_ID);

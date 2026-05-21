@@ -33,6 +33,8 @@ Usage:
 In app:
   /help               查看交互命令
   /plan <任务>        本轮先制定计划再执行
+  /context            查看当前上下文状态与压缩信息
+  /compact            立即压缩当前上下文并生成摘要
   /sessions           列出当前目录历史会话
   /reset              清空当前会话并开启新会话
   /exit               退出

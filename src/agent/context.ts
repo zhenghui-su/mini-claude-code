@@ -1,15 +1,167 @@
-import type { ModelMessage } from 'ai';
+import type { LanguageModelUsage, ModelMessage } from 'ai';
 import { generateText } from 'ai';
-import { model } from './provider';
+import { MODEL_ID, model } from './provider';
 
-// 主流模型上下文长度（以 128k 为例，调整此值适配不同模型）
-const MODEL_CONTEXT_LIMIT = 128_000;
-// 超过 80% 时触发压缩，留余量给 LLM 输出和工具结果
+export const DEFAULT_CONTEXT_LIMIT = 128_000;
 const COMPRESS_THRESHOLD = 0.8;
 
-// 使用 AI SDK 返回的真实 promptTokens 判断是否需要压缩
-export function shouldCompress(promptTokens: number): boolean {
-	return promptTokens > MODEL_CONTEXT_LIMIT * COMPRESS_THRESHOLD;
+export interface ContextSnapshot {
+	modelId: string;
+	contextLimit: number;
+	lastPromptTokens?: number;
+	lastTotalTokens?: number;
+	compressionCount: number;
+	lastCompressedAt?: string;
+	sessionSummary?: string;
+	workingMemory: string[];
+	userConstraints: string[];
+}
+
+export type CompressionReason = 'manual' | 'threshold';
+
+export interface CompactContextResult {
+	history: ModelMessage[];
+	context: ContextSnapshot;
+	summary: string;
+	previousMessageCount: number;
+	reason: CompressionReason;
+}
+
+interface CompactContextOptions {
+	history: ModelMessage[];
+	context: ContextSnapshot;
+	reason: CompressionReason;
+	compressor?: (history: ModelMessage[]) => Promise<string>;
+	now?: string;
+}
+
+export function createContextSnapshot(
+	overrides: Partial<ContextSnapshot> = {},
+): ContextSnapshot {
+	return {
+		modelId: overrides.modelId ?? MODEL_ID,
+		contextLimit: overrides.contextLimit ?? DEFAULT_CONTEXT_LIMIT,
+		lastPromptTokens: overrides.lastPromptTokens,
+		lastTotalTokens: overrides.lastTotalTokens,
+		compressionCount: overrides.compressionCount ?? 0,
+		lastCompressedAt: overrides.lastCompressedAt,
+		sessionSummary: overrides.sessionSummary?.trim() || undefined,
+		workingMemory: normalizeMemoryLines(overrides.workingMemory ?? []),
+		userConstraints: normalizeMemoryLines(overrides.userConstraints ?? []),
+	};
+}
+
+export function recordUsage(
+	context: ContextSnapshot,
+	usage: LanguageModelUsage,
+): ContextSnapshot {
+	return createContextSnapshot({
+		...context,
+		lastPromptTokens: usage.inputTokens,
+		lastTotalTokens: usage.totalTokens,
+	});
+}
+
+export function shouldCompress(
+	promptTokens: number,
+	contextLimit: number = DEFAULT_CONTEXT_LIMIT,
+): boolean {
+	return promptTokens > contextLimit * COMPRESS_THRESHOLD;
+}
+
+export function hasCompressibleHistory(history: ModelMessage[]): boolean {
+	return history.some((message) => extractMessageText(message.content).length > 0);
+}
+
+export async function compactContext({
+	history,
+	context,
+	reason,
+	compressor = compressHistory,
+	now = new Date().toISOString(),
+}: CompactContextOptions): Promise<CompactContextResult> {
+	if (!hasCompressibleHistory(history)) {
+		throw new Error('当前没有可压缩的历史记录');
+	}
+
+	const summary = (await compressor(history)).trim();
+	if (!summary) {
+		throw new Error('压缩结果为空');
+	}
+
+	const workingMemory = buildWorkingMemory(summary, context.workingMemory);
+
+	return {
+		history: [],
+		summary,
+		previousMessageCount: history.length,
+		reason,
+		context: createContextSnapshot({
+			...context,
+			compressionCount: context.compressionCount + 1,
+			lastCompressedAt: now,
+			sessionSummary: summary,
+			workingMemory,
+		}),
+	};
+}
+
+export function buildPromptContextSections(context: ContextSnapshot): string[] {
+	const sections: string[] = [];
+
+	const runtimeLines = [
+		`- 当前模型：${context.modelId}`,
+		`- 上下文上限：${context.contextLimit}`,
+	];
+	if (typeof context.lastPromptTokens === 'number') {
+		runtimeLines.push(`- 上一轮 prompt tokens：${context.lastPromptTokens}`);
+	}
+	if (typeof context.lastTotalTokens === 'number') {
+		runtimeLines.push(`- 上一轮 total tokens：${context.lastTotalTokens}`);
+	}
+	runtimeLines.push(`- 已压缩次数：${context.compressionCount}`);
+	if (context.lastCompressedAt) {
+		runtimeLines.push(`- 最近压缩时间：${context.lastCompressedAt}`);
+	}
+	sections.push(`# 运行时状态\n\n${runtimeLines.join('\n')}`);
+
+	if (context.userConstraints.length > 0) {
+		sections.push(
+			`# 用户约束\n\n${context.userConstraints.map((line) => `- ${line}`).join('\n')}`,
+		);
+	}
+
+	if (context.workingMemory.length > 0) {
+		sections.push(
+			`# 工作记忆\n\n${context.workingMemory.map((line) => `- ${line}`).join('\n')}`,
+		);
+	}
+
+	if (context.sessionSummary) {
+		sections.push(`# 会话摘要\n\n${context.sessionSummary}`);
+	}
+
+	return sections;
+}
+
+export function extractLegacySummary(runtimeHints: string[]): string | undefined {
+	for (const hint of runtimeHints) {
+		const looksLikeSummary =
+			hint.includes('[执行历史摘要 - 之前会话已压缩]') ||
+			/<completed>|<remaining>|<current_state>|<notes>/i.test(hint);
+		if (!looksLikeSummary) continue;
+
+		const cleaned = hint
+			.replace(/^\[执行历史摘要 - 之前会话已压缩\]\s*/u, '')
+			.replace(
+				/注意：以上是对之前执行历史的摘要，你处于重建会话状态。\s*请基于摘要继续完成原始任务，不要重复已完成的操作。\s*$/u,
+				'',
+			)
+			.trim();
+		if (cleaned) return cleaned;
+	}
+
+	return undefined;
 }
 
 // 将完整 history 压缩为结构化摘要
@@ -40,10 +192,12 @@ export async function compressHistory(
 `.trim();
 
 	const historyText = history
-		.map((m) => {
+		.map((message) => {
 			const content =
-				typeof m.content === 'string' ? m.content : JSON.stringify(m.content);
-			return `[${m.role}]\n${content}`;
+				typeof message.content === 'string'
+					? message.content
+					: JSON.stringify(message.content);
+			return `[${message.role}]\n${content}`;
 		})
 		.join('\n\n---\n\n');
 
@@ -51,20 +205,60 @@ export async function compressHistory(
 		model,
 		system: COMPRESS_SYSTEM,
 		prompt: historyText,
-		// maxSteps: 1,
 	});
 
 	return text;
 }
 
-// 用压缩摘要重建最小 history 和运行时 hint
-export function buildCompressionHint(summary: string): string {
-	return [
-		'[执行历史摘要 - 之前会话已压缩]',
-		'',
-		summary,
-		'',
-		'注意：以上是对之前执行历史的摘要，你处于重建会话状态。',
-		'请基于摘要继续完成原始任务，不要重复已完成的操作。',
-	].join('\n');
+function buildWorkingMemory(summary: string, fallback: string[]): string[] {
+	const remaining = extractSection(summary, 'remaining');
+	const currentState = extractSection(summary, 'current_state');
+
+	const memory = [
+		...sectionLines(remaining).slice(0, 3).map((line) => `待办: ${line}`),
+		...sectionLines(currentState).slice(0, 3).map((line) => `状态: ${line}`),
+	];
+
+	return normalizeMemoryLines(memory.length > 0 ? memory : fallback.slice(0, 4));
+}
+
+function extractSection(summary: string, tag: string): string {
+	const pattern = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i');
+	const match = summary.match(pattern);
+	return match?.[1]?.trim() ?? '';
+}
+
+function sectionLines(value: string): string[] {
+	return value
+		.split('\n')
+		.map((line) => line.replace(/^[-*•\d.)\s]+/u, '').trim())
+		.filter(Boolean);
+}
+
+function normalizeMemoryLines(lines: string[]): string[] {
+	const seen = new Set<string>();
+	const normalized: string[] = [];
+
+	for (const rawLine of lines) {
+		const line = rawLine.replace(/\s+/g, ' ').trim();
+		if (!line || seen.has(line)) continue;
+		seen.add(line);
+		normalized.push(line);
+	}
+
+	return normalized.slice(0, 8);
+}
+
+function extractMessageText(content: unknown): string {
+	if (typeof content === 'string') return content.trim();
+	if (Array.isArray(content)) {
+		return content.map(extractMessageText).filter(Boolean).join(' ').trim();
+	}
+	if (!content || typeof content !== 'object') return '';
+
+	const record = content as Record<string, unknown>;
+	if (typeof record.text === 'string') return record.text.trim();
+	if (typeof record.content === 'string') return record.content.trim();
+	if (typeof record.message === 'string') return record.message.trim();
+	return '';
 }

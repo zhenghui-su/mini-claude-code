@@ -9,9 +9,11 @@ import {
 	displayWidth,
 	extractMessageText,
 	formatSessionTime,
+	renderTerminalMarkdown,
 	truncateByDisplayWidth,
-	truncateDisplay,
 } from './format';
+import { renderInputBox } from './input-box';
+import { theme } from './theme';
 
 let isResumeScreenActive = false;
 
@@ -103,20 +105,113 @@ export async function chooseSession(): Promise<SavedSession | undefined> {
 }
 
 export function printSessionTranscript(session: SavedSession) {
-	const meaningful = session.history.filter(
-		(message) => message.role === 'user' || message.role === 'assistant',
-	);
-	if (meaningful.length === 0) return;
+	const transcript = buildSessionTranscript(session);
+	if (!transcript) return;
 
-	console.log('\x1b[1m已恢复历史记录：\x1b[0m');
-	for (const message of meaningful) {
+	console.log(transcript);
+}
+
+interface TranscriptTurn {
+	user?: string;
+	assistant?: string;
+	assistantFallback?: string;
+}
+
+interface TranscriptOptions {
+	colors?: boolean;
+	maxChars?: number;
+}
+
+export function buildSessionTranscript(
+	session: SavedSession,
+	options: TranscriptOptions = {},
+): string {
+	const turns = getTranscriptTurns(session);
+	if (turns.length === 0) return '';
+
+	const colors = options.colors ?? Boolean(process.stdout.isTTY);
+	const maxChars = options.maxChars ?? 1600;
+	const width = process.stdout.columns ? process.stdout.columns - 1 : undefined;
+	const lines = [colors ? theme.brand('已恢复历史记录：') : '已恢复历史记录：'];
+
+	for (const [index, turn] of turns.entries()) {
+		if (index > 0) lines.push('');
+		const divider = `── 第 ${index + 1} 轮 ──`;
+		lines.push(colors ? theme.muted(divider) : divider);
+
+		if (turn.user) {
+			lines.push(renderInputBox(turn.user, { colors, width }).text);
+		}
+
+		const assistant = turn.assistant ?? turn.assistantFallback;
+		if (assistant) {
+			lines.push(colors ? theme.transcriptLabel('Agent') : 'Agent');
+			lines.push(renderTranscriptBlock(assistant, maxChars, colors));
+		}
+	}
+
+	lines.push('');
+	return lines.join('\n');
+}
+
+function getTranscriptTurns(session: SavedSession): TranscriptTurn[] {
+	const turns: TranscriptTurn[] = [];
+	let current: TranscriptTurn | undefined;
+
+	const flush = () => {
+		if (!current) return;
+		if (current.user || current.assistant || current.assistantFallback) {
+			turns.push(current);
+		}
+		current = undefined;
+	};
+
+	for (const message of session.history) {
+		if (message.role === 'user') {
+			flush();
+			const text = extractMessageText(message.content);
+			current = text ? { user: text } : {};
+			continue;
+		}
+
+		if (message.role !== 'assistant') continue;
+
 		const text = extractMessageText(message.content);
 		if (!text) continue;
 
-		const label = message.role === 'user' ? '你' : 'Agent';
-		console.log(`\x1b[90m${label}:\x1b[0m ${truncateDisplay(text, 600)}`);
+		current ??= {};
+		if (containsToolCall(message.content)) {
+			current.assistantFallback = text;
+		} else {
+			current.assistant = text;
+		}
 	}
-	console.log('');
+
+	flush();
+	return turns;
+}
+
+function containsToolCall(content: unknown): boolean {
+	if (Array.isArray(content)) return content.some(containsToolCall);
+	if (!content || typeof content !== 'object') return false;
+
+	const record = content as Record<string, unknown>;
+	return record.type === 'tool-call' || typeof record.toolCallId === 'string';
+}
+
+function renderTranscriptBlock(
+	text: string,
+	maxChars: number,
+	colors: boolean,
+): string {
+	const truncated = truncateMarkdownBlock(text, maxChars);
+	return renderTerminalMarkdown(truncated, { colors });
+}
+
+function truncateMarkdownBlock(text: string, maxChars: number): string {
+	const trimmed = text.trim();
+	if (trimmed.length <= maxChars) return trimmed;
+	return `${trimmed.slice(0, Math.max(1, maxChars - 1)).trimEnd()}…`;
 }
 
 async function deleteSelectedSession(name: string) {

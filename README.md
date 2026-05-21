@@ -30,8 +30,8 @@ src/
 │   └── working-indicator.ts # 执行中动画
 ├── agent/
 │   ├── loop.ts       # Agent 循环：模型调用、工具回填、步骤输出
-│   ├── context.ts    # 上下文压缩
-│   ├── session.ts    # 会话保存/恢复
+│   ├── context.ts    # 分层上下文状态、压缩与记忆派生
+│   ├── session.ts    # 会话保存/恢复与旧格式迁移
 │   ├── prompt.ts     # 系统提示词组装
 │   └── provider.ts   # 模型提供商配置
 ├── tools/
@@ -75,7 +75,9 @@ AI SDK 将工具结果回填到 history
 模型继续推理，直到输出最终回答
 ```
 
-当上下文接近上限时，`context.ts` 会把历史压缩为结构化摘要，并在后续轮次作为 runtime hint 注入。
+CLI 会在每轮输入前显示 HUD，展示当前模型、最近 prompt token 占用、摘要状态和压缩次数。
+
+当上下文接近上限时，`context.ts` 会自动把历史压缩为结构化摘要；你也可以用 `/compact` 主动触发压缩。压缩后的摘要会写入 typed context state，并在后续轮次按“运行时状态 / 用户约束 / 工作记忆 / 会话摘要”的顺序注入系统提示词。
 
 ## Commands
 
@@ -83,13 +85,20 @@ AI SDK 将工具结果回填到 history
 
 - `/help`：查看帮助。
 - `/plan <任务>`：只对本轮开启计划模式，先生成执行计划，用户确认后才继续执行。输入框里 `/plan` 会高亮；不加 `/plan` 就是普通模式。
+- `/context`：查看当前上下文状态、token 用量、压缩次数和摘要情况。
+- `/compact`：立即压缩当前上下文，把历史折叠成结构化摘要。
 - `/sessions`：列出已保存会话。
 - `/reset`：清空当前会话历史。
 - `/exit`：退出。
 
 ## Sessions
 
-会话会自动保存到当前目录的 `.mini-claude/sessions/`，不需要手动输入保存命令。每次启动都会创建或更新当前会话；每轮对话完成后也会自动保存。
+会话会自动保存到当前目录的 `.mini-claude/sessions/`，不需要手动输入保存命令。每次启动都会创建或更新当前会话；每轮对话完成后也会自动保存。新的会话文件会同时持久化：
+
+- `history`：原始消息历史
+- `context`：模型 ID、context limit、最近 token 用量、压缩摘要、working memory、user constraints
+
+旧版只包含 `runtimeHints` 的会话文件会在加载时自动迁移到新的 `context` 结构。
 
 恢复历史会话：
 

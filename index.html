@@ -50,7 +50,7 @@
 		.hero .tagline {
 			font-size: 1.1rem;
 			color: #8b949e;
-			max-width: 520px;
+			max-width: 560px;
 			margin: 0 auto 1.2rem;
 		}
 
@@ -92,6 +92,16 @@
 
 		.section p:last-child {
 			margin-bottom: 0;
+		}
+
+		.section ul {
+			color: #c9d1d9;
+			padding-left: 1.5rem;
+			margin-bottom: 1rem;
+		}
+
+		.section ul li {
+			margin-bottom: 0.4rem;
 		}
 
 		/* ── Features Grid ───────────────────────────────────── */
@@ -259,6 +269,35 @@
 			margin-top: 0.4rem;
 		}
 
+		/* ── Permissions Table ────────────────────────────────── */
+		.perm-table {
+			width: 100%;
+			border-collapse: collapse;
+			font-size: 0.9rem;
+		}
+
+		.perm-table th,
+		.perm-table td {
+			text-align: left;
+			padding: 0.6rem 0.8rem;
+			border-bottom: 1px solid #21262d;
+		}
+
+		.perm-table th {
+			color: #8b949e;
+			font-weight: 500;
+			font-size: 0.85rem;
+		}
+
+		.perm-table td {
+			color: #c9d1d9;
+		}
+
+		.perm-table .perm-name {
+			font-family: 'SF Mono', monospace;
+			color: #7ee787;
+		}
+
 		/* ── Footer ──────────────────────────────────────────── */
 		footer {
 			margin-top: 4rem;
@@ -307,21 +346,27 @@
 				<span>mini-claude-code</span>
 			</div>
 			<p class="tagline">
-				终端里的轻量级 AI 编程助手 —— 读懂需求，自主调用工具完成代码任务。
+				ReAct 范式下的终端 Code Agent —— Agent 循环、工具调用、分层上下文管理，<br/>用最少的代码展现 AI Agent 的核心机制。
 			</p>
 			<span class="version">v1.0.1 · 开源教学项目</span>
 		</header>
 
-		<!-- ══════════ 简介 ══════════ -->
+		<!-- ══════════ 这是什么 ══════════ -->
 		<section class="section">
 			<h2><span class="icon">🤔</span> 这是什么？</h2>
 			<p>
 				<strong>mini-claude-code</strong> 是一个极简的 <strong>Code Agent</strong> 教学示例，灵感来自 <a href="https://docs.anthropic.com/en/docs/claude-code" style="color:#58a6ff;text-decoration:none;">Claude Code</a>。
-				它运行在终端中，通过与大语言模型的多轮对话理解你的需求，自主调用工具完成任务。
+				它运行在终端中，通过 LLM（默认 DeepSeek）驱动的 ReAct 循环理解你的需求，自主任意调用工具完成任务。
 			</p>
 			<p>
-				核心逻辑仅约 <strong>200 行</strong>代码，无臃肿依赖、无复杂抽象层。
-				非常适合用来理解 Agent 的工作原理和 <strong>Tool Calling</strong> 设计模式。
+				核心 Agent 循环仅约 <strong>160 行</strong>代码（<code>src/agent/loop.ts</code>），
+				配合 Vercel AI SDK 的 <code>generateText</code> + <code>tool</code> 机制，
+				无需复杂框架即可实现"思考→行动→观察→思考"的完整闭环。
+			</p>
+			<p>
+				项目聚焦 <strong>四层设计</strong>：
+				CLI 交互层 · Agent 循环层 · 工具注册层 · 安全/上下文辅助层。
+				每一层都能独立理解和替换，非常适合学习 Agent 架构。
 			</p>
 		</section>
 
@@ -342,15 +387,15 @@
 
 			<div class="cmd-block">
 				<code>
-<span class="prompt">$</span> cat .env<br/>
-DEEPSEEK_API_KEY=sk-xxxxxxxxxxxx<br/>
-DEEPSEEK_API_BASE_URL=https://api.deepseek.com
+	<span class="prompt">$</span> cat .env<br/>
+	DEEPSEEK_API_KEY=sk-xxxxxxxxxxxx<br/>
+	DEEPSEEK_API_BASE_URL=https://api.deepseek.com
 				</code>
 				<div class="desc">环境变量配置（以 DeepSeek 为例）</div>
 			</div>
 
 			<p style="margin-top:1rem;font-size:0.9rem;color:#8b949e;">
-				💡 支持 DeepSeek / OpenAI 兼容接口，修改 <code>provider.ts</code> 即可切换。
+				💡 支持 DeepSeek / OpenAI 兼容接口，修改 <code>src/agent/provider.ts</code> 即可切换。
 			</p>
 		</section>
 
@@ -359,66 +404,76 @@ DEEPSEEK_API_BASE_URL=https://api.deepseek.com
 			<h2><span class="icon">⚡</span> 核心功能</h2>
 			<div class="features">
 				<div class="feature-card">
+					<span class="emoji">🔄</span>
+					<h3>ReAct 循环</h3>
+					<p>思考 → 工具调用 → 结果回填 → 继续推理，最多支持 50 步深度推理</p>
+				</div>
+				<div class="feature-card">
+					<span class="emoji">📂</span>
+					<h3>分层上下文</h3>
+					<p>会话摘要、工作记忆、用户约束三层管理，超限时自动压缩并生成摘要</p>
+				</div>
+				<div class="feature-card">
 					<span class="emoji">📖</span>
-					<h3>读取文件</h3>
-					<p>分段读取大文件，带行号预览，不撑爆上下文</p>
-				</div>
-				<div class="feature-card">
-					<span class="emoji">✍️</span>
-					<h3>写入文件</h3>
-					<p>创建新文件或完整覆盖已有文件</p>
-				</div>
-				<div class="feature-card">
-					<span class="emoji">🔧</span>
-					<h3>局部编辑</h3>
-					<p>精确匹配字符串实现局部替换，避免全量重写</p>
+					<h3>文件读写</h3>
+					<p>分段读取大文件（offset/limit）、创建覆盖、精确局部替换</p>
 				</div>
 				<div class="feature-card">
 					<span class="emoji">🔍</span>
-					<h3>搜索内容</h3>
-					<p>在项目中搜索文本或符号，快速定位代码</p>
+					<h3>搜索 & 浏览</h3>
+					<p>全局文本搜索 + 目录结构浏览，快速理解项目全貌</p>
 				</div>
 				<div class="feature-card">
 					<span class="emoji">💻</span>
-					<h3>执行命令</h3>
-					<p>运行 Shell 命令并获取输出，安全拦截危险操作</p>
+					<h3>Shell 执行</h3>
+					<p>运行命令并获取输出，内置危险命令拦截与确认机制</p>
 				</div>
 				<div class="feature-card">
 					<span class="emoji">🌐</span>
-					<h3>抓取网页</h3>
-					<p>获取在线文档或 API 响应，转为 Markdown</p>
+					<h3>网页抓取</h3>
+					<p>获取在线文档或 API 响应，转为 Markdown 供 LLM 阅读</p>
+				</div>
+				<div class="feature-card">
+					<span class="emoji">🗂️</span>
+					<h3>会话管理</h3>
+					<p>自动保存历史、可恢复上次会话、查看所有历史会话列表</p>
+				</div>
+				<div class="feature-card">
+					<span class="emoji">📋</span>
+					<h3>计划模式</h3>
+					<p>/plan 命令先制定执行计划，用户确认后再执行，安全可控</p>
 				</div>
 			</div>
 		</section>
 
-		<!-- ══════════ 工具列表 ══════════ -->
+		<!-- ══════════ 可用工具 ══════════ -->
 		<section class="section">
 			<h2><span class="icon">🧰</span> 可用工具</h2>
-			<p>Agent 在循环中可自主调用以下工具：</p>
+			<p>Agent 在循环中可自主调用以下 7 个工具，覆盖读写、搜索、执行和网络四大权限：</p>
 			<div class="tools-grid">
 				<div class="tool-item">
-					<code>read_file</code>
-					<p>读取文件内容（支持 offset/limit）</p>
-				</div>
-				<div class="tool-item">
-					<code>write_file</code>
-					<p>创建或覆盖文件</p>
-				</div>
-				<div class="tool-item">
-					<code>edit_file</code>
-					<p>精确替换文件中的内容</p>
+					<code>list_files</code>
+					<p>浏览项目目录结构（支持递归深度 control）</p>
 				</div>
 				<div class="tool-item">
 					<code>search</code>
-					<p>搜索项目中的文本或符号</p>
+					<p>全局搜索文本或符号（大小写不敏感）</p>
 				</div>
 				<div class="tool-item">
-					<code>list_files</code>
-					<p>浏览项目目录结构</p>
+					<code>read_file</code>
+					<p>读取文件内容（支持 offset/limit 分段）</p>
+				</div>
+				<div class="tool-item">
+					<code>write_file</code>
+					<p>创建新文件或完整覆盖已有文件</p>
+				</div>
+				<div class="tool-item">
+					<code>edit_file</code>
+					<p>精确匹配字符串实现局部替换</p>
 				</div>
 				<div class="tool-item">
 					<code>bash</code>
-					<p>执行 Shell 命令</p>
+					<p>执行 Shell 命令（含危险命令检测）</p>
 				</div>
 				<div class="tool-item">
 					<code>web_fetch</code>
@@ -427,36 +482,116 @@ DEEPSEEK_API_BASE_URL=https://api.deepseek.com
 			</div>
 		</section>
 
-		<!-- ══════════ 架构 ══════════ -->
+		<!-- ══════════ 权限模型 ══════════ -->
+		<section class="section">
+			<h2><span class="icon">🔐</span> 权限模型</h2>
+			<p>每个工具按权限分类，方便控制 Agent 的能力边界：</p>
+			<table class="perm-table">
+				<thead>
+					<tr><th>权限</th><th>说明</th><th>涉及工具</th></tr>
+				</thead>
+				<tbody>
+					<tr><td class="perm-name">read</td><td>读取或搜索本地项目内容，不修改文件</td><td><code>list_files</code> <code>search</code> <code>read_file</code></td></tr>
+					<tr><td class="perm-name">write</td><td>创建、覆盖或局部修改文件</td><td><code>write_file</code> <code>edit_file</code></td></tr>
+					<tr><td class="perm-name">execute</td><td>执行 Shell 命令（危险命令需确认）</td><td><code>bash</code></td></tr>
+					<tr><td class="perm-name">network</td><td>访问网络资源</td><td><code>web_fetch</code></td></tr>
+				</tbody>
+			</table>
+		</section>
+
+		<!-- ══════════ CLI 命令 ══════════ -->
+		<section class="section">
+			<h2><span class="icon">⌨️</span> 交互命令</h2>
+			<p>在对话中输入以下 slash 命令控制 Agent 行为：</p>
+			<div class="cmd-block">
+				<code>/help</code>
+				<div class="desc">查看所有可用命令</div>
+			</div>
+			<div class="cmd-block">
+				<code>/plan &lt;任务描述&gt;</code>
+				<div class="desc">本轮先让 Agent 制定执行计划，确认后再执行</div>
+			</div>
+			<div class="cmd-block">
+				<code>/context</code>
+				<div class="desc">查看当前上下文状态（模型、token 用量、压缩信息）</div>
+			</div>
+			<div class="cmd-block">
+				<code>/compact</code>
+				<div class="desc">立即压缩上下文，将历史消息汇总为摘要</div>
+			</div>
+			<div class="cmd-block">
+				<code>/reset</code>
+				<div class="desc">清空当前会话历史，重新开始</div>
+			</div>
+			<div class="cmd-block">
+				<code>/sessions</code>
+				<div class="desc">列出所有已保存的历史会话</div>
+			</div>
+			<div class="cmd-block">
+				<code>/exit</code>
+				<div class="desc">退出程序</div>
+			</div>
+		</section>
+
+		<!-- ══════════ Agent 循环详解 ══════════ -->
+		<section class="section">
+			<h2><span class="icon">🔄</span> Agent 循环原理</h2>
+			<p>完整的交互流程如下：</p>
+			<ol style="color:#c9d1d9; padding-left:1.5rem; margin-bottom:1rem; line-height:2.2;">
+				<li><strong>用户输入</strong> → CLI 层解析 slash 命令或自然语言任务</li>
+				<li><strong>组装提示词</strong> → 将系统指令 + 上下文摘要 + 历史拼装发送给 LLM</li>
+				<li><strong>模型推理</strong> → LLM 决定是直接回答还是调用工具</li>
+				<li><strong>工具执行</strong> → SDK 自动解析参数、执行、将结果回填到消息中</li>
+				<li><strong>继续循环</strong> → LLM 结合工具结果继续推理，直到得到最终答案</li>
+				<li><strong>保存会话</strong> → 每轮结束后自动保存历史，支持 minicc resume 恢复</li>
+			</ol>
+			<p>
+				上下文超过 <strong>102k tokens</strong>（上限 128k 的 80%）时自动压缩，
+				将历史多条消息合并为一段摘要，配合工作记忆和用户约束形成三层分层上下文。
+			</p>
+		</section>
+
+		<!-- ══════════ 项目架构 ══════════ -->
 		<section class="section">
 			<h2><span class="icon">🏗️</span> 项目架构</h2>
 			<p>代码结构清晰，每个模块职责单一：</p>
 			<div class="tree">
 				<span class="dir">src/</span><br/>
-				&nbsp;&nbsp;├─ <span class="dir">agent/</span> &nbsp;<span class="comment"># Agent 核心循环</span><br/>
-				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">loop.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 模型调用 ↔ 工具回填 → 步骤输出</span><br/>
-				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">context.ts</span> &nbsp;&nbsp;&nbsp;<span class="comment"># 上下文压缩</span><br/>
-				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">session.ts</span> &nbsp;&nbsp;&nbsp;<span class="comment"># 会话保存 / 恢复</span><br/>
-				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">prompt.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 系统提示词组装</span><br/>
-				&nbsp;&nbsp;│&nbsp;&nbsp;└─ <span class="file">provider.ts</span> &nbsp;&nbsp;<span class="comment"># 模型提供商配置</span><br/>
-				&nbsp;&nbsp;├─ <span class="dir">tools/</span> &nbsp;&nbsp;<span class="comment"># 工具定义 &amp; 注册</span><br/>
-				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">index.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 工具注册入口</span><br/>
-				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">bash.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Shell 执行</span><br/>
-				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">edit-file.ts</span> &nbsp;&nbsp;<span class="comment"># 局部编辑</span><br/>
-				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">list-files.ts</span> &nbsp;<span class="comment"># 目录浏览</span><br/>
-				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">read-file.ts</span> &nbsp;&nbsp;<span class="comment"># 文件读取</span><br/>
-				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">search.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 文本搜索</span><br/>
-				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">web-fetch.ts</span> &nbsp;<span class="comment"># 网页抓取</span><br/>
+				&nbsp;&nbsp;├─ <span class="dir">cli/</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 终端交互层</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">app.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 主循环：命令分发、多轮输入、HUD 渲染</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">format.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 终端展示、时间/用量格式化</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">help.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 帮助与版本说明</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">constants.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 提示符与 slash 命令定义</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">resume.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 历史会话选择/恢复界面</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">slash.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># slash 命令匹配与 tab 补全</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">theme.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 终端颜色主题</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;└─ <span class="file">working-indicator.ts</span> <span class="comment"># 执行中动画</span><br/>
+				&nbsp;&nbsp;├─ <span class="dir">agent/</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Agent 核心层</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">loop.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># ReAct 循环：模型调用 ↔ 工具回填 ↔ 步骤输出</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">context.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 分层上下文、自动压缩、工作记忆</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">session.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 会话保存 / 恢复 / 旧格式迁移</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">prompt.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 系统提示词三段式组装</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">provider.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 模型提供商配置（DeepSeek / OpenAI）</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;└─ <span class="file">system-prompt.ts</span> <span class="comment"># 静态核心指令</span><br/>
+				&nbsp;&nbsp;├─ <span class="dir">tools/</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 工具定义 &amp; 注册</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">index.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 工具注册表（Zod 参数校验）</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">result.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 统一工具返回结构</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">bash.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Shell 执行</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">edit-file.ts</span> &nbsp;&nbsp;&nbsp;<span class="comment"># 局部编辑</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">list-files.ts</span> &nbsp;&nbsp;<span class="comment"># 目录浏览</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">read-file.ts</span> &nbsp;&nbsp;&nbsp;<span class="comment"># 文件读取</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">search.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 文本搜索</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">web-fetch.ts</span> &nbsp;&nbsp;<span class="comment"># 网页抓取</span><br/>
 				&nbsp;&nbsp;│&nbsp;&nbsp;└─ <span class="file">write-file.ts</span> &nbsp;<span class="comment"># 文件写入</span><br/>
-				&nbsp;&nbsp;├─ <span class="file">index.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 入口</span><br/>
-				&nbsp;&nbsp;└─ <span class="dir">utils/</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 辅助函数</span><br/>
-				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├─ <span class="file">confirm.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 用户确认交互</span><br/>
-				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├─ <span class="file">safety.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 命令安全检测</span><br/>
-				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└─ <span class="file">truncate.ts</span> &nbsp;&nbsp;&nbsp;<span class="comment"># 输出截断</span><br/>
+				&nbsp;&nbsp;├─ <span class="dir">utils/</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 辅助层</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">confirm.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 用户确认交互</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;├─ <span class="file">safety.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 路径安全检查 + 危险命令检测</span><br/>
+				&nbsp;&nbsp;│&nbsp;&nbsp;└─ <span class="file">truncate.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 工具输出过长时自动截断</span><br/>
+				&nbsp;&nbsp;└─ <span class="file">index.ts</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 入口：启动 CLI</span><br/>
 				<br/>
 				<span class="dir">bin/</span><br/>
-				&nbsp;&nbsp;└─ <span class="file">minicc.cjs</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># CLI 入口</span><br/>
-				<span class="dir">tests/</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 单元测试</span>
+				&nbsp;&nbsp;└─ <span class="file">minicc.cjs</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 全局命令行入口</span><br/>
+				<span class="dir">tests/</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 单元测试（context / session / tools / utils）</span>
 			</div>
 		</section>
 
@@ -466,10 +601,11 @@ DEEPSEEK_API_BASE_URL=https://api.deepseek.com
 			<div class="badges">
 				<span class="badge bun">Bun 运行时</span>
 				<span class="badge ts">TypeScript</span>
-				<span class="badge ai">AI SDK</span>
+				<span class="badge ai">Vercel AI SDK</span>
 				<span class="badge deepseek">DeepSeek</span>
 				<span class="badge openai">OpenAI 兼容</span>
 				<span class="badge">Zod 校验</span>
+				<span class="badge">Chalk 配色</span>
 			</div>
 		</section>
 
@@ -490,6 +626,11 @@ DEEPSEEK_API_BASE_URL=https://api.deepseek.com
 			<div class="cmd-block">
 				<code><span class="prompt">$</span> bun run link:global</code>
 				<div class="desc">全局安装，终端可直接使用 <code>minicc</code> 命令</div>
+			</div>
+
+			<div class="cmd-block">
+				<code><span class="prompt">$</span> minicc resume</code>
+				<div class="desc">恢复上次的对话历史继续工作</div>
 			</div>
 		</section>
 

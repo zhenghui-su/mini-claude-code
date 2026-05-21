@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { mkdtemp, realpath, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { createContextSnapshot } from '../../src/agent/context';
 import {
 	listSessions,
 	deleteSession,
@@ -29,7 +30,9 @@ afterEach(async () => {
 test('saveSession, loadSession and listSessions round-trip state', async () => {
 	await saveSession('demo session', {
 		history: [{ role: 'user', content: 'hello' }],
-		runtimeHints: ['hint'],
+		context: createContextSnapshot({
+			workingMemory: ['hint'],
+		}),
 	});
 
 	const loaded = await loadSession('demo-session');
@@ -37,7 +40,7 @@ test('saveSession, loadSession and listSessions round-trip state', async () => {
 
 	expect(loaded.name).toBe('demo-session');
 	expect(loaded.history).toEqual([{ role: 'user', content: 'hello' }]);
-	expect(loaded.runtimeHints).toEqual(['hint']);
+	expect(loaded.context.workingMemory).toEqual(['hint']);
 	expect(loaded.cwd).toBe(realTempDir);
 	expect(sessions.map((session) => session.name)).toContain('demo-session');
 });
@@ -50,7 +53,7 @@ test('saveSession stores a preview of the latest assistant reply', async () => {
 			{ role: 'user', content: 'another question' },
 			{ role: 'assistant', content: 'latest answer with useful context' },
 		],
-		runtimeHints: [],
+		context: createContextSnapshot(),
 	});
 
 	expect(summarizeSession(saved)).toMatchObject({
@@ -63,7 +66,7 @@ test('saveSession stores a preview of the latest assistant reply', async () => {
 test('deleteSession removes a saved session', async () => {
 	await saveSession('remove me', {
 		history: [{ role: 'user', content: 'temporary' }],
-		runtimeHints: [],
+		context: createContextSnapshot(),
 	});
 
 	await deleteSession('remove-me');
@@ -89,11 +92,44 @@ test('saveSession redacts sensitive tool output content', async () => {
 				],
 			} as never,
 		],
-		runtimeHints: [],
+		context: createContextSnapshot(),
 	});
 
 	const raw = await Bun.file('.mini-claude/sessions/sensitive.json').text();
 
 	expect(raw).not.toContain('SECRET=value');
 	expect(raw).toContain('已脱敏');
+});
+
+test('loadSession migrates legacy runtimeHints into typed context', async () => {
+	await Bun.write(
+		'.mini-claude/sessions/legacy.json',
+		JSON.stringify(
+			{
+				name: 'legacy',
+				createdAt: '2026-01-01T00:00:00.000Z',
+				updatedAt: '2026-01-01T00:00:00.000Z',
+				cwd: realTempDir,
+				history: [],
+				runtimeHints: [
+					[
+						'[执行历史摘要 - 之前会话已压缩]',
+						'',
+						'<completed>done</completed>',
+						'',
+						'注意：以上是对之前执行历史的摘要，你处于重建会话状态。',
+						'请基于摘要继续完成原始任务，不要重复已完成的操作。',
+					].join('\n'),
+				],
+			},
+			null,
+			2,
+		),
+	);
+
+	const session = await loadSession('legacy');
+
+	expect(session.context.sessionSummary).toContain('<completed>done</completed>');
+	expect(session.context.compressionCount).toBe(1);
+	expect(session.context.workingMemory).toEqual([]);
 });

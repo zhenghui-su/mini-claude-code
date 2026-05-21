@@ -8,8 +8,10 @@ import {
 } from 'ai';
 import { model } from './provider';
 import { assembleSystemPrompt } from './prompt';
+import type { ContextSnapshot } from './context';
 import { TOOLS } from '../tools';
 import { getToolResultMessage } from '../tools/result';
+import { renderTerminalMarkdown } from '../cli/format';
 
 const MAX_AGENT_STEPS = 50;
 
@@ -28,12 +30,11 @@ interface AgentLoopOptions {
 export async function createExecutionPlan(
 	question: string,
 	history: ModelMessage[],
-	runtimeHints: string[] = [],
+	context: ContextSnapshot,
 ): Promise<string> {
-	const system = await assembleSystemPrompt([
-		...runtimeHints,
+	const system = await assembleSystemPrompt(context, [
 		[
-			'[计划模式]',
+			'# 计划模式',
 			'本轮只制定执行计划，不要调用工具，不要修改文件，不要执行命令。',
 			'计划要简短、具体，说明会读取什么、可能修改什么、如何验证。',
 		].join('\n'),
@@ -59,10 +60,10 @@ export async function createExecutionPlan(
 export async function agentLoop(
 	question: string,
 	history: ModelMessage[],
-	runtimeHints: string[] = [],
+	context: ContextSnapshot,
 	options: AgentLoopOptions = {},
 ): Promise<RunResult> {
-	const system = await assembleSystemPrompt(runtimeHints);
+	const system = await assembleSystemPrompt(context);
 
 	// 将用户问题追加到 history 中
 	const messages: ModelMessage[] = [
@@ -126,7 +127,7 @@ function printStep({ text, toolCalls, toolResults }: StepInfo) {
 
 	// LLM 思考文本（如果有）
 	if (text.trim()) {
-		console.log(`\x1b[37m${text.trim()}\x1b[0m`);
+		console.log(renderTerminalMarkdown(text.trim()));
 	}
 
 	// 工具调用

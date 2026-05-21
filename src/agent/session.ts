@@ -2,10 +2,15 @@ import { mkdir, readdir, unlink } from 'fs/promises';
 import { join } from 'path';
 import type { ModelMessage } from 'ai';
 import { isSensitivePath } from '../utils/safety';
+import {
+	createContextSnapshot,
+	extractLegacySummary,
+	type ContextSnapshot,
+} from './context';
 
 export interface SessionState {
 	history: ModelMessage[];
-	runtimeHints: string[];
+	context: ContextSnapshot;
 }
 
 export interface SavedSession extends SessionState {
@@ -41,7 +46,7 @@ export async function saveSession(
 		cwd: process.cwd(),
 		lastReplyPreview: getLastReplyPreview(state.history),
 		history: sanitizeHistory(state.history),
-		runtimeHints: state.runtimeHints,
+		context: createContextSnapshot(state.context),
 	};
 
 	await Bun.write(path, JSON.stringify(session, null, 2));
@@ -57,7 +62,12 @@ export async function loadSession(name: string): Promise<SavedSession> {
 		throw new Error(`会话不存在：${safeName}`);
 	}
 
-	return JSON.parse(await file.text()) as SavedSession;
+	const session = await readSessionFile(path);
+	if (!session) {
+		throw new Error(`会话不存在：${safeName}`);
+	}
+
+	return session;
 }
 
 export async function deleteSession(name: string): Promise<void> {
@@ -124,8 +134,15 @@ async function readSessionFile(path: string): Promise<SavedSession | undefined> 
 	if (!(await file.exists())) return undefined;
 
 	try {
-		const parsed = JSON.parse(await file.text()) as Partial<SavedSession>;
+		const parsed = JSON.parse(await file.text()) as Partial<SavedSession> & {
+			runtimeHints?: string[];
+		};
 		if (!parsed.name || !parsed.createdAt || !parsed.updatedAt) return undefined;
+
+		const legacySummary = extractLegacySummary(parsed.runtimeHints ?? []);
+		const legacyHints = (parsed.runtimeHints ?? [])
+			.map((hint) => hint.trim())
+			.filter(Boolean);
 
 		return {
 			name: parsed.name,
@@ -135,7 +152,18 @@ async function readSessionFile(path: string): Promise<SavedSession | undefined> 
 			lastReplyPreview:
 				parsed.lastReplyPreview ?? getLastReplyPreview(parsed.history ?? []),
 			history: parsed.history ?? [],
-			runtimeHints: parsed.runtimeHints ?? [],
+			context: createContextSnapshot({
+				...parsed.context,
+				sessionSummary: parsed.context?.sessionSummary ?? legacySummary,
+				workingMemory:
+					parsed.context?.workingMemory ??
+					(legacySummary
+						? []
+						: legacyHints.slice(0, 8)),
+				userConstraints: parsed.context?.userConstraints ?? [],
+				compressionCount:
+					parsed.context?.compressionCount ?? (legacySummary ? 1 : 0),
+			}),
 		};
 	} catch {
 		return undefined;
