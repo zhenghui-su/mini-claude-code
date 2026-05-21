@@ -5,6 +5,7 @@ import { tmpdir } from 'os';
 import {
 	addModelProfile,
 	deleteModelProfile,
+	getDefaultModelId,
 	getModelBaseURL,
 	hasModelCredential,
 	isStoredModelProfile,
@@ -13,6 +14,7 @@ import {
 	listUsableModelProfiles,
 	normalizeModelProfile,
 	resolveLanguageModel,
+	setDefaultModelId,
 } from '../../src/agent/provider';
 
 let previousCwd: string;
@@ -147,6 +149,38 @@ test('deleteModelProfile removes custom model profiles', async () => {
 	expect((await listModelProfiles()).map((profile) => profile.id)).not.toContain(
 		'remove-me',
 	);
+});
+
+test('setDefaultModelId persists and deleteModelProfile clears matching default', async () => {
+	await addModelProfile({
+		id: 'first',
+		provider: 'openai-compatible',
+		modelId: 'first-model',
+		baseURL: 'https://example.com/v1',
+		apiKey: 'test-key',
+	});
+	await addModelProfile({
+		id: 'second',
+		provider: 'openai-compatible',
+		modelId: 'second-model',
+		baseURL: 'https://example.com/v1',
+		apiKey: 'test-key',
+	});
+
+	expect(await setDefaultModelId('second')).toBe('second');
+	expect(await getDefaultModelId()).toBe('second');
+
+	await addModelProfile({
+		id: 'third',
+		provider: 'openai-compatible',
+		modelId: 'third-model',
+		baseURL: 'https://example.com/v1',
+		apiKey: 'test-key',
+	});
+	expect(await getDefaultModelId()).toBe('second');
+
+	await deleteModelProfile('second');
+	expect(await getDefaultModelId()).toBeUndefined();
 });
 
 test('resolveLanguageModel builds an AI SDK model from a compatible profile', async () => {

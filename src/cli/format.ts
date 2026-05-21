@@ -19,10 +19,21 @@ export function formatSessionTime(value: string): string {
 }
 
 export function formatTokenCount(value: number): string {
-	if (value >= 100_000) return `${Math.round(value / 1000)}k`;
+	if (value >= 1_000_000) return `${formatScaledTokenCount(value, 1_000_000)}M`;
+	if (value >= 100_000) {
+		const thousands = Math.round(value / 1000);
+		if (thousands >= 1000) return '1M';
+		return `${thousands}k`;
+	}
 	if (value >= 10_000) return `${(value / 1000).toFixed(1)}k`;
 	if (value >= 1_000) return `${(value / 1000).toFixed(1)}k`;
 	return String(value);
+}
+
+function formatScaledTokenCount(value: number, scale: number): string {
+	const scaled = value / scale;
+	const formatted = scaled >= 10 ? scaled.toFixed(0) : scaled.toFixed(1);
+	return formatted.replace(/\.0$/u, '');
 }
 
 export function formatCwdPath(value: string): string {

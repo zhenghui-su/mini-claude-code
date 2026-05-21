@@ -17,7 +17,19 @@ import { theme } from './theme';
 
 let isResumeScreenActive = false;
 
+type SessionPickerMode = 'resume' | 'manage';
+
 export async function chooseSession(): Promise<SavedSession | undefined> {
+	return runSessionPicker('resume');
+}
+
+export async function manageSessions(): Promise<void> {
+	await runSessionPicker('manage');
+}
+
+async function runSessionPicker(
+	mode: SessionPickerMode,
+): Promise<SavedSession | undefined> {
 	let sessions = await listSessions();
 	if (sessions.length === 0) {
 		console.log('\x1b[90m[当前目录暂无历史会话]\x1b[0m');
@@ -42,33 +54,32 @@ export async function chooseSession(): Promise<SavedSession | undefined> {
 			if (deleteIndex !== undefined) {
 				if (key?.name === 'escape' || key?.name === 'n' || key?.name === 'q') {
 					deleteIndex = undefined;
-					renderResumeList(sessions, selectedIndex, deleteIndex);
+					renderSessionList(sessions, selectedIndex, { mode, deleteIndex });
 					return;
 				}
 				if (key?.name === 'y') {
 					const session = sessions[deleteIndex];
 					if (!session) return;
 
-					void deleteSelectedSession(session.name)
-						.then(async () => {
-							sessions = await listSessions();
-							deleteIndex = undefined;
-							if (sessions.length === 0) {
-								finish(undefined);
-								return;
-							}
-							selectedIndex = Math.min(selectedIndex, sessions.length - 1);
-							renderResumeList(sessions, selectedIndex, deleteIndex);
-						})
-						.catch((e) => {
-							deleteIndex = undefined;
-							renderResumeList(
-								sessions,
-								selectedIndex,
-								deleteIndex,
-								`删除失败：${(e as Error).message}`,
-							);
-						});
+						void deleteSelectedSession(session.name)
+							.then(async () => {
+								sessions = await listSessions();
+								deleteIndex = undefined;
+								if (sessions.length === 0) {
+									finish(undefined);
+									return;
+								}
+								selectedIndex = Math.min(selectedIndex, sessions.length - 1);
+								renderSessionList(sessions, selectedIndex, { mode, deleteIndex });
+							})
+							.catch((e) => {
+								deleteIndex = undefined;
+								renderSessionList(sessions, selectedIndex, {
+									mode,
+									deleteIndex,
+									message: `删除失败：${(e as Error).message}`,
+								});
+							});
 					return;
 				}
 				return;
@@ -78,29 +89,29 @@ export async function chooseSession(): Promise<SavedSession | undefined> {
 				finish(undefined);
 				return;
 			}
-			if (key?.name === 'return') {
+			if (mode === 'resume' && key?.name === 'return') {
 				finish(sessions[selectedIndex]);
 				return;
 			}
 			if (key?.name === 'd') {
 				deleteIndex = selectedIndex;
-				renderResumeList(sessions, selectedIndex, deleteIndex);
+				renderSessionList(sessions, selectedIndex, { mode, deleteIndex });
 				return;
 			}
 			if (key?.name === 'up') {
 				selectedIndex = (selectedIndex - 1 + sessions.length) % sessions.length;
-				renderResumeList(sessions, selectedIndex, deleteIndex);
+				renderSessionList(sessions, selectedIndex, { mode, deleteIndex });
 				return;
 			}
 			if (key?.name === 'down') {
 				selectedIndex = (selectedIndex + 1) % sessions.length;
-				renderResumeList(sessions, selectedIndex, deleteIndex);
+				renderSessionList(sessions, selectedIndex, { mode, deleteIndex });
 			}
 		};
 
 		process.stdin.on('keypress', onKeypress);
 		enterResumeScreen();
-		renderResumeList(sessions, selectedIndex, deleteIndex);
+		renderSessionList(sessions, selectedIndex, { mode, deleteIndex });
 	});
 }
 
@@ -218,16 +229,34 @@ async function deleteSelectedSession(name: string) {
 	await deleteSession(name);
 }
 
-function renderResumeList(
+interface SessionListRenderOptions {
+	mode?: SessionPickerMode;
+	colors?: boolean;
+	width?: number;
+	deleteIndex?: number;
+	message?: string;
+}
+
+export function renderSessionListLines(
 	sessions: SavedSession[],
 	selectedIndex: number,
-	deleteIndex?: number,
-	message?: string,
-) {
-	const maxWidth = Math.max(40, (process.stdout.columns ?? 80) - 1);
-	const lines = [
-		`\x1b[1m${truncateByDisplayWidth('选择要恢复的会话', maxWidth)}\x1b[0m`,
-		`\x1b[90m${truncateByDisplayWidth('↑/↓ 选择，Enter 恢复，d 删除，q 取消', maxWidth)}\x1b[0m`,
+	options: SessionListRenderOptions = {},
+): string[] {
+	const mode = options.mode ?? 'resume';
+	const colors = options.colors ?? Boolean(process.stdout.isTTY);
+	const maxWidth = Math.max(
+		40,
+		(options.width ?? process.stdout.columns ?? 80) - 1,
+	);
+	const title =
+		mode === 'resume' ? '选择要恢复的会话' : '管理历史会话';
+	const help =
+		mode === 'resume'
+			? '↑/↓ 选择，Enter 恢复，d 删除，q 取消'
+			: '↑/↓ 选择，d 删除，q 返回';
+	return [
+		styleListLine(title, 'title', colors, maxWidth),
+		styleListLine(help, 'muted', colors, maxWidth),
 		...sessions.map((session, index) => {
 			const summary = summarizeSession(session);
 			const marker = index === selectedIndex ? '›' : ' ';
@@ -238,22 +267,55 @@ function renderResumeList(
 				Math.min(24, previewWidth),
 			);
 			const clipped = `${prefix}${preview}`;
-			return index === selectedIndex ? `\x1b[7m${clipped}\x1b[0m` : clipped;
+			return index === selectedIndex && colors
+				? `\x1b[7m${clipped}\x1b[0m`
+				: clipped;
 		}),
-		...(deleteIndex !== undefined
+		...(options.deleteIndex !== undefined
 			? [
-					`\x1b[31m${truncateByDisplayWidth(`确认删除该会话？按 y 删除，n 取消`, maxWidth)}\x1b[0m`,
+					styleListLine(
+						'确认删除该会话？按 y 删除，n 取消',
+						'danger',
+						colors,
+						maxWidth,
+					),
 				]
 			: []),
-		...(message
-			? [`\x1b[33m${truncateByDisplayWidth(message, maxWidth)}\x1b[0m`]
+		...(options.message
+			? [styleListLine(options.message, 'warning', colors, maxWidth)]
 			: []),
 	];
+}
+
+function renderSessionList(
+	sessions: SavedSession[],
+	selectedIndex: number,
+	options: SessionListRenderOptions = {},
+) {
+	const lines = renderSessionListLines(sessions, selectedIndex, {
+		...options,
+		colors: true,
+	});
 
 	if (process.stdout.isTTY) {
 		process.stdout.write('\x1b[H\x1b[2J');
 	}
 	process.stdout.write(lines.join('\n'));
+}
+
+function styleListLine(
+	value: string,
+	style: 'title' | 'muted' | 'danger' | 'warning',
+	colors: boolean,
+	width: number,
+): string {
+	const text = truncateByDisplayWidth(value, width);
+	if (!colors) return text;
+
+	if (style === 'title') return `\x1b[1m${text}\x1b[0m`;
+	if (style === 'muted') return `\x1b[90m${text}\x1b[0m`;
+	if (style === 'danger') return `\x1b[31m${text}\x1b[0m`;
+	return `\x1b[33m${text}\x1b[0m`;
 }
 
 function enterResumeScreen() {

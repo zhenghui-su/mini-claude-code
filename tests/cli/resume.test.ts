@@ -1,7 +1,10 @@
 import { expect, test } from 'bun:test';
 import { createContextSnapshot } from '../../src/agent/context';
 import type { SavedSession } from '../../src/agent/session';
-import { buildSessionTranscript } from '../../src/cli/resume';
+import {
+	buildSessionTranscript,
+	renderSessionListLines,
+} from '../../src/cli/resume';
 
 test('buildSessionTranscript renders markdown and hides tool-call progress text', () => {
 	const session: SavedSession = {
@@ -65,4 +68,29 @@ test('buildSessionTranscript renders markdown and hides tool-call progress text'
 	expect(transcript).not.toContain('让我先看看当前工作目录的结构。');
 	expect(transcript).not.toContain('**');
 	expect(transcript).not.toContain('`');
+});
+
+test('renderSessionListLines supports session management with delete prompt', () => {
+	const session: SavedSession = {
+		name: 'demo',
+		createdAt: '2026-01-01T00:00:00.000Z',
+		updatedAt: '2026-01-01T00:00:00.000Z',
+		cwd: process.cwd(),
+		lastReplyPreview: 'reply',
+		context: createContextSnapshot(),
+		history: [],
+	};
+
+	const lines = renderSessionListLines([session], 0, {
+		mode: 'manage',
+		colors: false,
+		width: 80,
+		deleteIndex: 0,
+	});
+
+	expect(lines[0]).toBe('管理历史会话');
+	expect(lines[1]).toBe('↑/↓ 选择，d 删除，q 返回');
+	expect(lines[2]).toContain('› ');
+	expect(lines[2]).toContain('reply');
+	expect(lines[3]).toBe('确认删除该会话？按 y 删除，n 取消');
 });

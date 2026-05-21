@@ -30,16 +30,20 @@ test('renderModelPickerLines marks selected, active and add rows', () => {
 		100,
 		false,
 		new Set(['custom-openai']),
+		'custom-openai',
 	);
 
 	expect(lines[0]).toBe('选择模型');
-	expect(lines[1]).toBe('↑/↓ 选择，Enter 切换/新增，e 修改，d 删除，q 取消');
+	expect(lines[1]).toBe(
+		'↑/↓ 选择，Enter 切换/新增，s 默认，e 修改，d 删除，q 取消',
+	);
 	expect(lines[2]).toContain('openai-official');
 	expect(lines[2]).toContain('内置');
 	expect(lines[3]).toContain('› * custom-openai');
 	expect(lines[3]).toContain('openai-compatible/gpt-custom');
 	expect(lines[3]).toContain('key 已配置');
 	expect(lines[3]).toContain('自定义');
+	expect(lines[3]).toContain('默认');
 	expect(lines[4]).toBe('  + 新增模型');
 });
 

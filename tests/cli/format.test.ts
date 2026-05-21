@@ -3,6 +3,7 @@ import {
 	displayWidth,
 	formatCwdPath,
 	formatDuration,
+	formatTokenCount,
 	getUsageRing,
 	renderHudLine,
 	renderTerminalMarkdown,
@@ -12,6 +13,14 @@ import {
 test('formatDuration renders seconds and minutes', () => {
 	expect(formatDuration(1_400)).toBe('1s');
 	expect(formatDuration(65_000)).toBe('1m 5s');
+});
+
+test('formatTokenCount uses k and M units', () => {
+	expect(formatTokenCount(999)).toBe('999');
+	expect(formatTokenCount(12_500)).toBe('12.5k');
+	expect(formatTokenCount(999_999)).toBe('1M');
+	expect(formatTokenCount(1_000_000)).toBe('1M');
+	expect(formatTokenCount(1_250_000)).toBe('1.3M');
 });
 
 test('truncateByDisplayWidth counts wide characters', () => {

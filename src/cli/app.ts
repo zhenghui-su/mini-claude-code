@@ -17,18 +17,18 @@ import {
 import {
 	addModelProfile,
 	deleteModelProfile,
+	getDefaultModelId,
 	hasModelCredential,
 	isStoredModelProfile,
 	listUsableModelProfiles,
 	normalizeModelProfile,
+	setDefaultModelId,
 	type ModelProfile,
 	type ModelProviderKind,
 } from '../agent/provider';
 import {
 	createSessionName,
-	listSessions,
 	saveSession,
-	summarizeSession,
 } from '../agent/session';
 import {
 	askKeyedQuestion,
@@ -39,7 +39,6 @@ import {
 	displayWidth,
 	formatContextReport,
 	formatDuration,
-	formatSessionTime,
 	getContextUsageDisplay,
 	renderHudLine,
 	renderTerminalMarkdown,
@@ -48,7 +47,7 @@ import {
 import { printCliHelp, printHelp } from './help';
 import { renderInputBox } from './input-box';
 import { chooseModel, chooseModelProvider } from './model';
-import { chooseSession, printSessionTranscript } from './resume';
+import { chooseSession, manageSessions, printSessionTranscript } from './resume';
 import {
 	completeSlashInput,
 	getSlashMatches,
@@ -245,18 +244,7 @@ class CliApp {
 		}
 
 		if (question === '/sessions') {
-			const sessions = await listSessions();
-			if (sessions.length === 0) {
-				console.log(theme.status('暂无已保存会话'));
-			} else {
-				console.log(`\n${theme.brand('已保存会话：')}`);
-				for (const session of sessions) {
-					const summary = summarizeSession(session);
-					console.log(
-						`  ${formatSessionTime(summary.updatedAt)}  ${summary.lastReplyPreview}`,
-					);
-				}
-			}
+			await manageSessions();
 			this.startInput();
 			return;
 		}
@@ -431,15 +419,20 @@ class CliApp {
 	private async ensureUsableModelConfigured(): Promise<boolean> {
 		const usableProfiles = await listUsableModelProfiles();
 		if (usableProfiles.length > 0) {
-			if (!usableProfiles.some((profile) => profile.id === this.context.modelId)) {
-				const profile = usableProfiles[0];
-				if (profile) {
-					this.context = createContextSnapshot({
-						...this.context,
-						modelId: profile.id,
-						contextLimit: profile.contextLimit,
-					});
-				}
+			const defaultModelId = await getDefaultModelId();
+			const defaultProfile = usableProfiles.find(
+				(profile) => profile.id === defaultModelId,
+			);
+			const currentProfile = usableProfiles.find(
+				(profile) => profile.id === this.context.modelId,
+			);
+			const profile = defaultProfile ?? currentProfile ?? usableProfiles[0];
+			if (profile && profile.id !== this.context.modelId) {
+				this.context = createContextSnapshot({
+					...this.context,
+					modelId: profile.id,
+					contextLimit: profile.contextLimit,
+				});
 			}
 			return true;
 		}
@@ -583,6 +576,11 @@ class CliApp {
 					return;
 				}
 
+				if (result.type === 'set-default') {
+					await this.setDefaultModelInteractively(result.profile);
+					return;
+				}
+
 				await this.switchModel(result.profile);
 				return;
 			}
@@ -604,6 +602,16 @@ class CliApp {
 		});
 		await this.saveCurrentSession();
 		console.log(theme.status(`已切换模型：${profile.id}`));
+	}
+
+	private async setDefaultModelInteractively(profile: ModelProfile) {
+		if (!hasModelCredential(profile)) {
+			console.log(theme.warningStatus(`模型 ${profile.id} 缺少 API Key，不能设为默认`));
+			return;
+		}
+
+		await setDefaultModelId(profile.id);
+		console.log(theme.status(`已设为默认模型：${profile.id}`));
 	}
 
 	private async addModelInteractively(
@@ -770,9 +778,13 @@ class CliApp {
 				continue;
 			}
 
+			const defaultModelId = existing ? await getDefaultModelId() : undefined;
 			const saved = await addModelProfile(profile);
 			if (existing && existing.id !== saved.id) {
 				await deleteModelProfile(existing.id);
+				if (defaultModelId === existing.id) {
+					await setDefaultModelId(saved.id);
+				}
 			}
 
 			if (options.mode === 'add' || this.context.modelId === existing?.id) {
@@ -920,16 +932,7 @@ class CliApp {
 			readline.moveCursor(process.stdout, 0, -layout.cursorRow);
 		}
 		readline.cursorTo(process.stdout, 0);
-		const rowsToClear = layout.totalRows + 4;
-		for (let i = 0; i < rowsToClear; i++) {
-			readline.clearLine(process.stdout, 0);
-			if (i < rowsToClear - 1) {
-				readline.moveCursor(process.stdout, 0, 1);
-			}
-		}
-		if (rowsToClear > 1) {
-			readline.moveCursor(process.stdout, 0, -(rowsToClear - 1));
-		}
+		readline.clearScreenDown(process.stdout);
 		readline.cursorTo(process.stdout, 0);
 		this.renderedInputLineWidths = [];
 		this.renderedInputCursorLine = 0;

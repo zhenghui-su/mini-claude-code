@@ -1,5 +1,6 @@
 import readline from 'readline';
 import {
+	getDefaultModelId,
 	getModelBaseURL,
 	hasModelCredential,
 	listStoredModelProfileIds,
@@ -29,7 +30,8 @@ export type ModelPickerResult =
 	| { type: 'use'; profile: ModelProfile }
 	| { type: 'add' }
 	| { type: 'edit'; profile: ModelProfile }
-	| { type: 'delete'; profile: ModelProfile };
+	| { type: 'delete'; profile: ModelProfile }
+	| { type: 'set-default'; profile: ModelProfile };
 
 export type ModelProviderPickerResult = {
 	type: 'select';
@@ -81,6 +83,7 @@ export async function chooseModel(
 ): Promise<ModelPickerResult | undefined> {
 	const profiles = await listModelProfiles();
 	const editableModelIds = await listStoredModelProfileIds();
+	const defaultModelId = await getDefaultModelId();
 	let selectedIndex = getInitialModelIndex(profiles, activeModelId);
 	let message: string | undefined;
 
@@ -120,6 +123,7 @@ export async function chooseModel(
 						activeModelId,
 						selectedIndex,
 						editableModelIds,
+						defaultModelId,
 						message,
 					);
 					return;
@@ -136,11 +140,17 @@ export async function chooseModel(
 						activeModelId,
 						selectedIndex,
 						editableModelIds,
+						defaultModelId,
 						message,
 					);
 					return;
 				}
 				finish({ type: 'delete', profile: selectedItem.profile });
+				return;
+			}
+			if (key?.name === 's') {
+				if (selectedItem?.type !== 'model') return;
+				finish({ type: 'set-default', profile: selectedItem.profile });
 				return;
 			}
 			if (key?.name === 'up') {
@@ -151,6 +161,7 @@ export async function chooseModel(
 					activeModelId,
 					selectedIndex,
 					editableModelIds,
+					defaultModelId,
 				);
 				return;
 			}
@@ -162,13 +173,20 @@ export async function chooseModel(
 					activeModelId,
 					selectedIndex,
 					editableModelIds,
+					defaultModelId,
 				);
 			}
 		};
 
 		process.stdin.on('keypress', onKeypress);
 		enterModelScreen();
-		renderModelPicker(profiles, activeModelId, selectedIndex, editableModelIds);
+		renderModelPicker(
+			profiles,
+			activeModelId,
+			selectedIndex,
+			editableModelIds,
+			defaultModelId,
+		);
 	});
 }
 
@@ -226,6 +244,7 @@ export function renderModelPickerLines(
 	width: number,
 	colors = false,
 	editableModelIds: ReadonlySet<string> = new Set(),
+	defaultModelId?: string,
 	message?: string,
 ): string[] {
 	const maxWidth = Math.max(40, width);
@@ -234,7 +253,7 @@ export function renderModelPickerLines(
 	const lines = [
 		style('选择模型', 'title', colors, maxWidth),
 		style(
-			'↑/↓ 选择，Enter 切换/新增，e 修改，d 删除，q 取消',
+			'↑/↓ 选择，Enter 切换/新增，s 默认，e 修改，d 删除，q 取消',
 			'muted',
 			colors,
 			maxWidth,
@@ -244,6 +263,7 @@ export function renderModelPickerLines(
 				activeModelId,
 				editable:
 					item.type === 'model' && editableModelIds.has(item.profile.id),
+				default: item.type === 'model' && item.profile.id === defaultModelId,
 				selected: index === selected,
 				width: maxWidth,
 				colors,
@@ -293,6 +313,7 @@ function renderModelPicker(
 	activeModelId: string,
 	selectedIndex: number,
 	editableModelIds: ReadonlySet<string> = new Set(),
+	defaultModelId?: string,
 	message?: string,
 ) {
 	const maxWidth = Math.max(40, (process.stdout.columns ?? 80) - 1);
@@ -303,6 +324,7 @@ function renderModelPicker(
 		maxWidth,
 		true,
 		editableModelIds,
+		defaultModelId,
 		message,
 	);
 
@@ -327,6 +349,7 @@ function renderModelPickerItem(
 	options: {
 		activeModelId: string;
 		editable: boolean;
+		default: boolean;
 		selected: boolean;
 		width: number;
 		colors: boolean;
@@ -348,7 +371,8 @@ function renderModelPickerItem(
 	const baseURL = getModelBaseURL(profile) ?? '官方默认';
 	const source = options.editable ? '自定义' : '内置';
 	const prefix = `${marker} ${active} ${profile.id}  `;
-	const details = `${profile.provider}/${profile.modelId}  ${baseURL}  ${credential}  ${source}`;
+	const defaultMark = options.default ? '  默认' : '';
+	const details = `${profile.provider}/${profile.modelId}  ${baseURL}  ${credential}  ${source}${defaultMark}`;
 	const available = Math.max(8, options.width - displayWidth(prefix));
 	const line = `${prefix}${truncateByDisplayWidth(details, available)}`;
 

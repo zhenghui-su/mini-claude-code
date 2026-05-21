@@ -30,6 +30,7 @@ export interface ModelProfile {
 }
 
 interface StoredModelFile {
+	defaultModelId?: string;
 	models?: Partial<ModelProfile>[];
 }
 
@@ -52,6 +53,17 @@ export async function listModelProfiles(): Promise<ModelProfile[]> {
 
 export async function listUsableModelProfiles(): Promise<ModelProfile[]> {
 	return (await listModelProfiles()).filter(hasModelCredential);
+}
+
+export async function getDefaultModelId(): Promise<string | undefined> {
+	const stored = await readStoredModelFile();
+	return normalizeOptionalModelProfileId(stored.defaultModelId);
+}
+
+export async function setDefaultModelId(id: string): Promise<string> {
+	const normalized = normalizeModelProfileId(id);
+	await writeStoredModelConfig(await readStoredModelProfiles(), normalized);
+	return normalized;
 }
 
 export async function getModelProfile(
@@ -83,7 +95,11 @@ export async function deleteModelProfile(id: string): Promise<boolean> {
 	const next = existing.filter((profile) => profile.id !== normalized);
 	if (next.length === existing.length) return false;
 
-	await writeStoredModelProfiles(next);
+	const defaultModelId = await getDefaultModelId();
+	await writeStoredModelConfig(
+		next,
+		defaultModelId === normalized ? undefined : defaultModelId,
+	);
 	return true;
 }
 
@@ -234,24 +250,46 @@ function getBuiltinModelProfiles(): ModelProfile[] {
 }
 
 async function readStoredModelProfiles(): Promise<ModelProfile[]> {
-	const file = Bun.file(modelConfigPath());
-	if (!(await file.exists())) return [];
-
 	try {
-		const parsed = JSON.parse(await file.text()) as StoredModelFile;
-		return (parsed.models ?? []).map((profile) => normalizeModelProfile(profile));
+		const stored = await readStoredModelFile();
+		return (stored.models ?? []).map((profile) =>
+			normalizeModelProfile(profile),
+		);
 	} catch {
 		return [];
+	}
+}
+
+async function readStoredModelFile(): Promise<StoredModelFile> {
+	const file = Bun.file(modelConfigPath());
+	if (!(await file.exists())) return {};
+
+	try {
+		return JSON.parse(await file.text()) as StoredModelFile;
+	} catch {
+		return {};
 	}
 }
 
 async function writeStoredModelProfiles(
 	profiles: ModelProfile[],
 ): Promise<void> {
+	await writeStoredModelConfig(profiles, await getDefaultModelId());
+}
+
+async function writeStoredModelConfig(
+	profiles: ModelProfile[],
+	defaultModelId?: string,
+): Promise<void> {
 	await mkdir(modelConfigDir(), { recursive: true });
+	const body: StoredModelFile = {
+		models: profiles.map(stripEmptyFields),
+	};
+	if (defaultModelId) body.defaultModelId = defaultModelId;
+
 	await Bun.write(
 		modelConfigPath(),
-		JSON.stringify({ models: profiles.map(stripEmptyFields) }, null, 2),
+		JSON.stringify(body, null, 2),
 	);
 }
 
@@ -302,6 +340,15 @@ function normalizeContextLimit(value: unknown): number {
 
 function cleanOptional(value: unknown): string | undefined {
 	return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function normalizeOptionalModelProfileId(value: unknown): string | undefined {
+	if (typeof value !== 'string' || !value.trim()) return undefined;
+	try {
+		return normalizeModelProfileId(value);
+	} catch {
+		return undefined;
+	}
 }
 
 function modelConfigDir(): string {
